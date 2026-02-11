@@ -1,10 +1,9 @@
 <div align="center">
-  <img src="public/logo.svg" alt="Claude Code UI" width="64" height="64">
-  <h1>Cloud CLI (aka Claude Code UI)</h1>
+  <img src="public/logo.svg" alt="Vibe Lab" width="64" height="64">
+  <h1>Vibe Lab</h1>
 </div>
 
-
-A desktop and mobile UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor CLI](https://docs.cursor.com/en/cli/overview) and [Codex](https://developers.openai.com/codex). You can use it locally or remotely to view your active projects and sessions in Claude Code, Cursor, or Codex and make changes to them from everywhere (mobile or desktop). This gives you a proper interface that works everywhere. 
+A desktop and mobile UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor CLI](https://docs.cursor.com/en/cli/overview) and [Codex](https://developers.openai.com/codex), with an integrated **Research Lab** for AI-driven research automation. You can use it locally or remotely to view your active projects and sessions, manage research pipelines, and make changes from everywhere (mobile or desktop).
 
  [English](./README.md) | [中文](./README.zh-CN.md)
 
@@ -43,6 +42,8 @@ A desktop and mobile UI for [Claude Code](https://docs.anthropic.com/en/docs/cla
 
 ## Features
 
+- **Research Lab** - Structured dashboard for AI-driven research: view overview, source papers, generated ideas (rendered as Markdown with LaTeX math), pipeline status, and cache artifacts at a glance
+- **InnoFlow Skills** - Built-in modular research pipeline skills (orchestrator, resource preparation, idea generation, code survey, implementation plan, ML dev, experiments) that guide agents step-by-step
 - **Responsive Design** - Works seamlessly across desktop, tablet, and mobile so you can also use Claude Code, Cursor, or Codex from mobile 
 - **Interactive Chat Interface** - Built-in chat interface for seamless communication with Claude Code, Cursor, or Codex
 - **Integrated Shell Terminal** - Direct access to Claude Code, Cursor CLI, or Codex through built-in shell functionality
@@ -119,7 +120,7 @@ cloudcli status                   # Show current configuration
 
 ### Run as Background Service (Recommended for Production)
 
-For production use, run Claude Code UI as a background service using PM2 (Process Manager 2):
+For production use, run Vibe Lab as a background service using PM2 (Process Manager 2):
 
 #### Install PM2
 
@@ -143,7 +144,7 @@ pm2 start cloudcli --name "claude-code-ui" -- --port 8080
 
 #### Auto-Start on System Boot
 
-To make Claude Code UI start automatically when your system boots:
+To make Vibe Lab start automatically when your system boots:
 
 ```bash
 # Generate startup script for your platform
@@ -207,7 +208,7 @@ To use Claude Code's full functionality, you'll need to manually enable tools:
 
 ## TaskMaster AI Integration *(Optional)*
 
-Claude Code UI supports **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** (aka claude-task-master) integration for advanced project management and AI-powered task planning.
+Vibe Lab supports **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** (aka claude-task-master) integration for advanced project management and AI-powered task planning.
 
 It provides
 - AI-powered task generation from PRDs (Product Requirements Documents)
@@ -221,6 +222,35 @@ After installing it you should be able to enable it from the Settings
 ## Usage Guide
 
 ### Core Features
+
+#### Research Lab
+
+The **Research Lab** tab provides a structured, read-at-a-glance dashboard for AI-driven research projects:
+
+- **Research Overview** — Displays the target paper, task description, instance ID, category, and pipeline mode (Plan vs. Idea)
+- **Source Papers** — Lists all referenced papers with type badges (methodology, component, etc.)
+- **Final Selected Idea** — Renders the best idea produced by the pipeline as rich Markdown, with full support for LaTeX math (KaTeX), GFM tables, code blocks, and nested lists. Includes copy-to-clipboard and collapsible view
+- **Pipeline Configuration** — Shows instance path, task level, category, dataset, and workspace name
+- **Research Artifacts** — Groups all cache files by pipeline stage (Data Loading, Prepare, Idea Generation, Code Survey, ML Development, etc.) with expand/collapse navigation and a built-in file viewer/editor
+
+Data is loaded from `instance.json`, `pipeline_config.json`, and the `outputs/cache/` directory within the project.
+
+#### InnoFlow Research Skills
+
+Vibe Lab ships with 8 modular research pipeline skills under `skills/`:
+
+| Skill | Purpose |
+|-------|---------|
+| **inno-research-orchestrator** | Meta skill: judges input maturity (plan vs. idea), constructs instance JSON, sets up workspace paths |
+| **inno-prepare-resources** | GitHub search, Prepare Agent query, arXiv paper download |
+| **inno-idea-generation** | Generates N diverse ideas, selects the best one (with prompt templates in `prompts/`) |
+| **inno-repo-acquisition** | Acquires missing code repositories |
+| **inno-code-survey** | Surveys codebases for implementation details |
+| **inno-implementation-plan** | Creates a detailed implementation plan |
+| **inno-ml-dev-iteration** | ML implementation with judge-loop iteration |
+| **inno-experiment-submit-refine** | Submits experiments, analyses results, and refines |
+
+When a project is created, Vibe Lab automatically symlinks these skills into `<project>/.claude/skills/` so Claude can discover and follow them. Skills do not conflict with users' own `.claude/skills/` directory.
 
 #### Project Management
 It automatically discovers Claude Code, Cursor or Codex sessions when available and groups them together into projects
@@ -368,5 +398,5 @@ This project is open source and free to use, modify, and distribute under the GP
 ---
 
 <div align="center">
-  <strong>Made with care for the Claude Code, Cursor and Codex community.</strong>
+  <strong>Vibe Lab — Made with care for the Claude Code, Cursor and Codex community.</strong>
 </div>

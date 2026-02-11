@@ -1,10 +1,9 @@
 <div align="center">
-  <img src="public/logo.svg" alt="Claude Code UI" width="64" height="64">
-  <h1>Cloud CLI (又名 Claude Code UI)</h1>
+  <img src="public/logo.svg" alt="Vibe Lab" width="64" height="64">
+  <h1>Vibe Lab</h1>
 </div>
 
-
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Cursor CLI](https://docs.cursor.com/en/cli/overview) 和 [Codex](https://developers.openai.com/codex) 的桌面端和移动端界面。您可以在本地或远程使用它来查看 Claude Code、Cursor 或 Codex 中的活跃项目和会话,并从任何地方(移动端或桌面端)对它们进行修改。这为您提供了一个在任何地方都能正常使用的合适界面。
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Cursor CLI](https://docs.cursor.com/en/cli/overview) 和 [Codex](https://developers.openai.com/codex) 的桌面端和移动端界面，集成了 **Research Lab** 用于 AI 驱动的研究自动化。您可以在本地或远程使用它来查看项目和会话、管理研究流水线，并从任何地方（移动端或桌面端）进行修改。
 
  [English](./README.md) | [中文](./README.zh-CN.md)
 
@@ -43,6 +42,8 @@
 
 ## 功能特性
 
+- **Research Lab（研究实验室）** - 结构化的研究仪表盘：一览研究概况、参考论文、生成的 Idea（支持 LaTeX 数学公式的 Markdown 渲染）、流水线状态和缓存产物
+- **InnoFlow Skills（研究流水线技能）** - 内置 8 个模块化研究流水线技能（编排器、资源准备、Idea 生成、代码调研、实现计划、ML 开发、实验提交），逐步引导 Agent 执行
 - **响应式设计** - 在桌面、平板和移动设备上无缝运行,您也可以在移动端使用 Claude Code、Cursor 或 Codex
 - **交互式聊天界面** - 内置聊天界面,与 Claude Code、Cursor 或 Codex 无缝通信
 - **集成 Shell 终端** - 通过内置 shell 功能直接访问 Claude Code、Cursor CLI 或 Codex
@@ -120,7 +121,7 @@ cloudcli status                   # 显示当前配置
 
 ### 作为后台服务运行(推荐用于生产环境)
 
-在生产环境中,使用 PM2(Process Manager 2)将 Claude Code UI 作为后台服务运行:
+在生产环境中,使用 PM2（Process Manager 2）将 Vibe Lab 作为后台服务运行:
 
 #### 安装 PM2
 
@@ -144,7 +145,7 @@ pm2 start cloudcli --name "claude-code-ui" -- --port 8080
 
 #### 系统启动时自动启动
 
-要使 Claude Code UI 在系统启动时自动启动:
+要使 Vibe Lab 在系统启动时自动启动:
 
 ```bash
 # 为您的平台生成启动脚本
@@ -208,7 +209,7 @@ npm run dev
 
 ## TaskMaster AI 集成 *(可选)*
 
-Claude Code UI 支持 **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)**(aka claude-task-master)集成,用于高级项目管理和 AI 驱动的任务规划。
+Vibe Lab 支持 **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)**（aka claude-task-master）集成,用于高级项目管理和 AI 驱动的任务规划。
 
 它提供
 - 从 PRD(产品需求文档)生成 AI 驱动的任务
@@ -222,6 +223,35 @@ Claude Code UI 支持 **[TaskMaster AI](https://github.com/eyaltoledano/claude-t
 ## 使用指南
 
 ### 核心功能
+
+#### Research Lab（研究实验室）
+
+**Research Lab** 标签页提供了一个结构化的研究项目仪表盘：
+
+- **研究概览** — 展示目标论文、任务描述、实例 ID、类别、流水线模式（Plan / Idea）
+- **参考论文** — 列出所有参考论文，附带类型标签（方法论、组件等）
+- **最终选定 Idea** — 将流水线生成的最佳 Idea 渲染为富 Markdown，完整支持 LaTeX 数学公式（KaTeX）、GFM 表格、代码块和嵌套列表。支持一键复制和折叠展开
+- **流水线配置** — 显示实例路径、任务级别、类别、数据集和工作区名称
+- **研究产物** — 将所有缓存文件按流水线阶段分组（数据加载、准备、Idea 生成、代码调研、ML 开发等），支持展开/折叠导航和内置文件查看/编辑器
+
+数据从项目内的 `instance.json`、`pipeline_config.json` 和 `outputs/cache/` 目录加载。
+
+#### InnoFlow 研究技能
+
+Vibe Lab 在 `skills/` 目录下内置了 8 个模块化研究流水线技能：
+
+| 技能 | 用途 |
+|------|------|
+| **inno-research-orchestrator** | 元技能：判断输入成熟度（plan / idea），构建 instance JSON，设置工作区路径 |
+| **inno-prepare-resources** | GitHub 搜索、Prepare Agent 查询、arXiv 论文下载 |
+| **inno-idea-generation** | 生成 N 个多样化 Idea 并选择最佳方案（含 `prompts/` 中的提示模板） |
+| **inno-repo-acquisition** | 获取缺失的代码仓库 |
+| **inno-code-survey** | 调研代码库中的实现细节 |
+| **inno-implementation-plan** | 创建详细的实现计划 |
+| **inno-ml-dev-iteration** | ML 实现 + Judge 循环迭代 |
+| **inno-experiment-submit-refine** | 提交实验、分析结果并优化 |
+
+创建项目时，Vibe Lab 会自动将这些技能以 symlink 方式链接到 `<project>/.claude/skills/`，Claude 即可发现并遵循。技能不会与用户自己的 `.claude/skills/` 目录冲突。
 
 #### 项目管理
 当可用时,它会自动发现 Claude Code、Cursor 或 Codex 会话并将它们分组到项目中
@@ -367,5 +397,5 @@ GNU General Public License v3.0 - 详见 [LICENSE](LICENSE) 文件。
 ---
 
 <div align="center">
-  <strong>为 Claude Code、Cursor 和 Codex 社区精心打造。</strong>
+  <strong>Vibe Lab — 为 Claude Code、Cursor 和 Codex 社区精心打造。</strong>
 </div>
