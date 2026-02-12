@@ -43,14 +43,13 @@ A desktop and mobile UI for [Claude Code](https://docs.anthropic.com/en/docs/cla
 ## Features
 
 - **Research Lab** - Structured dashboard for AI-driven research: view overview, source papers, generated ideas (rendered as Markdown with LaTeX math), pipeline status, and cache artifacts at a glance
-- **InnoFlow Skills** - Built-in modular research pipeline skills (orchestrator, resource preparation, idea generation, code survey, implementation plan, ML dev, experiments) that guide agents step-by-step
+- **InnoFlow Skills** - Built-in modular research pipeline skills (orchestrator, resource preparation, idea generation, code survey, experiment development, experiment analysis) that guide agents step-by-step
 - **Responsive Design** - Works seamlessly across desktop, tablet, and mobile so you can also use Claude Code, Cursor, or Codex from mobile
 - **Interactive Chat Interface** - Built-in chat interface for seamless communication with Claude Code, Cursor, or Codex
 - **Integrated Shell Terminal** - Direct access to Claude Code, Cursor CLI, or Codex through built-in shell functionality
 - **File Explorer** - Interactive file tree with syntax highlighting and live editing
 - **Git Explorer** - View, stage and commit your changes. You can also switch branches
 - **Session Management** - Resume conversations, manage multiple sessions, and track history
-- **TaskMaster AI Integration** *(Optional)* - Advanced project management with AI-powered task planning, PRD parsing, and workflow automation
 - **Model Compatibility** - Works with Claude Sonnet 4.5, Opus 4.5, and GPT-5.2
 
 
@@ -59,108 +58,17 @@ A desktop and mobile UI for [Claude Code](https://docs.anthropic.com/en/docs/cla
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v20 or higher
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and configured, and/or
-- [Cursor CLI](https://docs.cursor.com/en/cli/overview) installed and configured, and/or
-- [Codex](https://developers.openai.com/codex) installed and configured
+- At least one of the following CLI tools installed and configured:
+  - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+  - [Cursor CLI](https://docs.cursor.com/en/cli/overview)
+  - [Codex](https://developers.openai.com/codex)
 
-### One-click Operation (Recommended)
-
-No installation required, direct operation:
-
-```bash
-npx @siteboon/claude-code-ui
-```
-
-The server will start and be accessible at `http://localhost:3001` (or your configured PORT).
-
-**To restart**: Simply run the same `npx` command again after stopping the server
-### Global Installation (For Regular Use)
-
-For frequent use, install globally once:
-
-```bash
-npm install -g @siteboon/claude-code-ui
-```
-
-Then start with a simple command:
-
-```bash
-claude-code-ui
-```
-
-
-**To restart**: Stop with Ctrl+C and run `claude-code-ui` again.
-
-**To update**:
-```bash
-cloudcli update
-```
-
-### CLI Usage
-
-After global installation, you have access to both `claude-code-ui` and `cloudcli` commands:
-
-| Command / Option | Short | Description |
-|------------------|-------|-------------|
-| `cloudcli` or `claude-code-ui` | | Start the server (default) |
-| `cloudcli start` | | Start the server explicitly |
-| `cloudcli status` | | Show configuration and data locations |
-| `cloudcli update` | | Update to the latest version |
-| `cloudcli help` | | Show help information |
-| `cloudcli version` | | Show version information |
-| `--port <port>` | `-p` | Set server port (default: 3001) |
-| `--database-path <path>` | | Set custom database location |
-
-**Examples:**
-```bash
-cloudcli                          # Start with defaults
-cloudcli -p 8080              # Start on custom port
-cloudcli status                   # Show current configuration
-```
-
-### Run as Background Service (Recommended for Production)
-
-For production use, run Vibe Lab as a background service using PM2 (Process Manager 2):
-
-#### Install PM2
-
-```bash
-npm install -g pm2
-```
-
-#### Start as Background Service
-
-```bash
-# Start the server in background
-pm2 start claude-code-ui --name "claude-code-ui"
-
-# Or using the shorter alias
-pm2 start cloudcli --name "claude-code-ui"
-
-# Start on a custom port
-pm2 start cloudcli --name "claude-code-ui" -- --port 8080
-```
-
-
-#### Auto-Start on System Boot
-
-To make Vibe Lab start automatically when your system boots:
-
-```bash
-# Generate startup script for your platform
-pm2 startup
-
-# Save current process list
-pm2 save
-```
-
-
-### Local Development Installation
+### Installation
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/siteboon/claudecodeui.git
-cd claudecodeui
+git clone https://github.com/bbsngg/VibeLab.git
+cd VibeLab
 ```
 
 2. **Install dependencies:**
@@ -171,19 +79,68 @@ npm install
 3. **Configure environment:**
 ```bash
 cp .env.example .env
-# Edit .env with your preferred settings
+# Edit .env with your preferred settings (port, etc.)
 ```
 
 4. **Start the application:**
 ```bash
 # Development mode (with hot reload)
 npm run dev
+```
+
+5. **Open your browser** at `http://localhost:3001` (or the port you configured in `.env`)
+
+## Research Lab — Quick Example
+
+The core feature of Vibe Lab is the **Research Lab**: an AI-driven research pipeline that takes a research topic and automatically generates ideas, writes experiment code, runs experiments, and analyzes results.
+
+Here is how a typical research session looks:
+
+### 1. Describe your research task
+
+Open a project in Vibe Lab, switch to the **Chat** tab, and type something like:
 
 ```
-The application will start at the port you specified in your .env
+I want to research biomedical question answering. Here are some related papers:
+- "Neural Question Answering at BioASQ 5B" (http://arxiv.org/abs/1706.08568v1)
 
-5. **Open your browser:**
-   - Development: `http://localhost:3001`
+Dataset: BioASQ Factoid QA
+```
+
+The **orchestrator** skill automatically classifies this as an *idea-level* task, constructs the necessary metadata, and begins the pipeline.
+
+### 2. The pipeline runs step-by-step
+
+```
+Orchestrator          →  Judges input maturity, sets up workspace
+  ↓
+Prepare Resources     →  Searches GitHub, clones reference repos, downloads papers
+  ↓
+Idea Generation       →  Generates 5 diverse ideas, selects & refines the best one
+  ↓
+Code Survey           →  Acquires extra repos, surveys codebases for reusable components
+  ↓
+Experiment Dev        →  Creates implementation plan, writes full project code,
+                         iterates with a Judge agent, submits experiment (3–10 epochs)
+  ↓
+Experiment Analysis   →  Analyzes results, draws charts, suggests improvements,
+                         implements refinements, runs further experiments
+```
+
+Each step produces cache artifacts (JSON logs) that you can inspect in the **Research Lab** dashboard.
+
+### 3. Review results in the dashboard
+
+Switch to the **Research Lab** tab to see:
+
+- **Research Overview** — your task, chosen idea, pipeline mode
+- **Generated Ideas** — rendered as rich Markdown with LaTeX math formulas
+- **Pipeline Artifacts** — grouped by stage, with built-in viewer/editor
+- **Experiment Results** — training logs, metrics, analysis reports, charts
+
+All data lives in `instance.json`, `pipeline_config.json`, and `outputs/cache/` inside the project directory.
+
+> **Tip**: You can also provide a *full implementation plan* instead of a topic. The orchestrator will detect it as *plan-level* and skip idea generation, jumping straight to code survey and experiment development.
 
 ## Security & Tools Configuration
 
@@ -206,92 +163,81 @@ To use Claude Code's full functionality, you'll need to manually enable tools:
 
 **Recommended approach**: Start with basic tools enabled and add more as needed. You can always adjust these settings later.
 
-## TaskMaster AI Integration *(Optional)*
-
-Vibe Lab supports **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** (aka claude-task-master) integration for advanced project management and AI-powered task planning.
-
-It provides
-- AI-powered task generation from PRDs (Product Requirements Documents)
-- Smart task breakdown and dependency management
-- Visual task boards and progress tracking
-
-**Setup & Documentation**: Visit the [TaskMaster AI GitHub repository](https://github.com/eyaltoledano/claude-task-master) for installation instructions, configuration guides, and usage examples.
-After installing it you should be able to enable it from the Settings
-
-
 ## Usage Guide
 
-### Core Features
+After starting Vibe Lab, open your browser and follow the steps below.
 
-#### Research Lab
+### Step 1 — Create or Open a Project
 
-The **Research Lab** tab provides a structured, read-at-a-glance dashboard for AI-driven research projects:
+When you first open Vibe Lab you will see the **Projects** sidebar. You have two options:
 
-- **Research Overview** — Displays the target paper, task description, instance ID, category, and pipeline mode (Plan vs. Idea)
-- **Source Papers** — Lists all referenced papers with type badges (methodology, component, etc.)
-- **Final Selected Idea** — Renders the best idea produced by the pipeline as rich Markdown, with full support for LaTeX math (KaTeX), GFM tables, code blocks, and nested lists. Includes copy-to-clipboard and collapsible view
-- **Pipeline Configuration** — Shows instance path, task level, category, dataset, and workspace name
-- **Research Artifacts** — Groups all cache files by pipeline stage (Data Loading, Prepare, Idea Generation, Code Survey, ML Development, etc.) with expand/collapse navigation and a built-in file viewer/editor
+- **Open an existing project** — Vibe Lab auto-discovers projects from Claude Code, Cursor, and Codex sessions. Click any listed project to open it.
+- **Create a new project** — Click the **"+"** button, choose a directory on your machine, and Vibe Lab will set up the workspace for you.
 
-Data is loaded from `instance.json`, `pipeline_config.json`, and the `outputs/cache/` directory within the project.
+### Step 2 — Choose Your CLI
 
-#### InnoFlow Research Skills
+In the project view, click the **CLI selector** (top of the sidebar) to pick which agent backend to use:
 
-Vibe Lab ships with 8 modular research pipeline skills under `skills/`:
+| Backend | When to use |
+|---------|-------------|
+| **Claude Code** | General-purpose coding agent by Anthropic |
+| **Cursor CLI** | Cursor IDE's built-in agent |
+| **Codex** | OpenAI's Codex agent |
+
+You can switch between backends at any time without losing project context.
+
+### Step 3 — Start Working
+
+You have several ways to interact with your project:
+
+| Tab | What it does |
+|-----|-------------|
+| **Chat** | Send prompts to the selected CLI agent. Supports streaming responses, session resume, message history, code blocks, and file references. |
+| **Shell** | Drop directly into the CLI terminal for full command-line control. |
+| **Files** | Browse the project file tree, view and edit files with syntax highlighting, create/rename/delete files. |
+| **Git** | View diffs, stage changes, commit, and switch branches — all from the UI. |
+| **Research Lab** | *(See below)* Structured dashboard for AI-driven research pipelines. |
+
+### Step 4 (Optional) — Use the Research Lab
+
+The **Research Lab** tab is designed for structured, multi-step AI research. It provides:
+
+- **Research Overview** — Target paper, task description, instance ID, category, pipeline mode (Plan vs. Idea)
+- **Source Papers** — All referenced papers with type badges
+- **Final Selected Idea** — Rich Markdown rendering with LaTeX math (KaTeX), GFM tables, code blocks. Copy-to-clipboard and collapsible view
+- **Pipeline Configuration** — Instance path, task level, category, dataset, workspace name
+- **Research Artifacts** — Cache files grouped by pipeline stage with expand/collapse navigation and built-in viewer/editor
+
+Data is loaded from `instance.json`, `pipeline_config.json`, and `outputs/cache/` within the project.
+
+#### InnoFlow Research Pipeline
+
+Vibe Lab ships with modular research skills under `skills/`. When a project is created, they are symlinked into `<project>/.claude/skills/` so the agent can discover and follow them automatically.
+
+**Pipeline overview** (Idea mode):
+
+```
+Orchestrator → Prepare Resources → Idea Generation → Code Survey → Experiment Dev → Experiment Analysis
+```
 
 | Skill | Purpose |
 |-------|---------|
-| **inno-research-orchestrator** | Meta skill: judges input maturity (plan vs. idea), constructs instance JSON, sets up workspace paths |
-| **inno-prepare-resources** | GitHub search, Prepare Agent query, arXiv paper download |
-| **inno-idea-generation** | Generates N diverse ideas, selects the best one (with prompt templates in `prompts/`) |
-| **inno-repo-acquisition** | Acquires missing code repositories |
-| **inno-code-survey** | Surveys codebases for implementation details |
-| **inno-implementation-plan** | Creates a detailed implementation plan |
-| **inno-ml-dev-iteration** | ML implementation with judge-loop iteration |
-| **inno-experiment-submit-refine** | Submits experiments, analyses results, and refines |
+| **inno-research-orchestrator** | Entry point: judges input maturity (plan vs. idea), constructs instance JSON, sets up workspace |
+| **inno-prepare-resources** | GitHub search, clone reference repos, download arXiv papers |
+| **inno-idea-generation** | Generates N diverse ideas, selects and refines the best one |
+| **inno-code-survey** | Phase A: acquire extra repos for the chosen idea; Phase B: comprehensive code survey |
+| **inno-experiment-dev** | Creates implementation plan, writes project code with judge feedback loop, submits experiment |
+| **inno-experiment-analysis** | Analyzes results, draws charts, gives code suggestions, implements refinements |
 
-When a project is created, Vibe Lab automatically symlinks these skills into `<project>/.claude/skills/` so Claude can discover and follow them. Skills do not conflict with users' own `.claude/skills/` directory.
+To start a research run, open the **Chat** tab and describe your research task (e.g. *"I want to research biomedical question answering"*). The orchestrator skill will guide the agent through the full pipeline.
 
-#### Project Management
-It automatically discovers Claude Code, Cursor or Codex sessions when available and groups them together into projects
-session counts
-- **Project Actions** - Rename, delete, and organize projects
-- **Smart Navigation** - Quick access to recent projects and sessions
-- **MCP support** - Add your own MCP servers through the UI
+### Mobile & Tablet
 
-#### Chat Interface
-- **Use responsive chat or Claude Code/Cursor CLI/Codex CLI** - You can either use the adapted chat interface or use the shell button to connect to your selected CLI.
-- **Real-time Communication** - Stream responses from your selected CLI (Claude Code/Cursor/Codex) with WebSocket connection
-- **Session Management** - Resume previous conversations or start fresh sessions
-- **Message History** - Complete conversation history with timestamps and metadata
-- **Multi-format Support** - Text, code blocks, and file references
+Vibe Lab is fully responsive. On mobile devices:
 
-#### File Explorer & Editor
-- **Interactive File Tree** - Browse project structure with expand/collapse navigation
-- **Live File Editing** - Read, modify, and save files directly in the interface
-- **Syntax Highlighting** - Support for multiple programming languages
-- **File Operations** - Create, rename, delete files and directories
-
-#### Git Explorer
-
-
-#### TaskMaster AI Integration *(Optional)*
-- **Visual Task Board** - Kanban-style interface for managing development tasks
-- **PRD Parser** - Create Product Requirements Documents and parse them into structured tasks
-- **Progress Tracking** - Real-time status updates and completion tracking
-
-#### Session Management
-- **Session Persistence** - All conversations automatically saved
-- **Session Organization** - Group sessions by project and timestamp
-- **Session Actions** - Rename, delete, and export conversation history
-- **Cross-device Sync** - Access sessions from any device
-
-### Mobile App
-- **Responsive Design** - Optimized for all screen sizes
-- **Touch-friendly Interface** - Swipe gestures and touch navigation
-- **Mobile Navigation** - Bottom tab bar for easy thumb navigation
-- **Adaptive Layout** - Collapsible sidebar and smart content prioritization
-- **Add shortcut to Home Screen** - Add a shortcut to your home screen and the app will behave like a PWA
+- **Bottom tab bar** for thumb-friendly navigation
+- **Swipe gestures** and touch-optimized controls
+- **Add to Home Screen** to use it as a PWA (Progressive Web App)
 
 ## Architecture
 
@@ -384,7 +330,6 @@ This project is open source and free to use, modify, and distribute under the GP
 - **[Vite](https://vitejs.dev/)** - Fast build tool and dev server
 - **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
 - **[CodeMirror](https://codemirror.net/)** - Advanced code editor
-- **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(Optional)* - AI-powered project management and task planning
 
 ## Support & Community
 
