@@ -101,10 +101,18 @@ Here is how a typical research session looks:
 Open a project in Vibe Lab, switch to the **Chat** tab, and type something like:
 
 ```
-I want to research biomedical question answering. Here are some related papers:
-- "Neural Question Answering at BioASQ 5B" (http://arxiv.org/abs/1706.08568v1)
+Task: Train a neural network model for biomedical question answering using the
+BioASQ factoid QA dataset. The task is to develop a model that can accurately
+answer biomedical questions given supporting document contexts. The model should
+leverage neural architectures to improve over traditional IR-based methods, with
+a focus on handling domain-specific biomedical terminology and concepts.
 
-Dataset: BioASQ Factoid QA
+Related papers:
+- Making neural QA as simple as possible but not simpler
+- Global vectors for word representation
+- Continuous space word vectors obtained by applying word2vec to abstracts of biomedical articles
+- Bidirectional attention flow for machine comprehension
+- Learning to answer biomedical questions: OAQA at BioASQ 4B
 ```
 
 The **orchestrator** skill automatically classifies this as an *idea-level* task, constructs the necessary metadata, and begins the pipeline.
