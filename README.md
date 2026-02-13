@@ -328,16 +328,6 @@ We welcome contributions! Please follow these guidelines:
 - Ensure you're not trying to access system directories outside project scope
 
 
-#### "Error: posix_spawnp failed"
-**Problem**: The shell fails to start with the error `Error: posix_spawnp failed`.
-**Solutions**:
-- This usually means the system cannot find the default shell (`bash` on macOS/Linux or `powershell.exe` on Windows).
-- Ensure `bash` is installed and available in your system's `PATH`.
-- If you are using a non-standard shell (like Nushell or Fish) as your default, make sure `bash` is still accessible.
-- Try running the server from a standard terminal where `bash` is confirmed to work.
-- (Advanced) On some macOS systems, you may need to ensure `/bin/bash` exists.
-
-
 ## License
 
 GNU General Public License v3.0 - see [LICENSE](LICENSE) file for details.

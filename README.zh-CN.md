@@ -327,16 +327,6 @@ Vibe Lab 完全响应式设计。在移动设备上：
 - 确保您未尝试访问项目范围之外的系统目录
 
 
-#### "Error: posix_spawnp failed"
-**问题**: 启动 Shell 时报错 `Error: posix_spawnp failed`。
-**解决方案**:
-- 这通常意味着系统无法找到默认的 Shell（macOS/Linux 上为 `bash`，Windows 上为 `powershell.exe`）。
-- 请确保您的系统中已安装 `bash` 并将其添加到系统的 `PATH` 环境变量中。
-- 如果您使用非标准 Shell（如 Nushell 或 Fish）作为默认 Shell，请确保 `bash` 仍然可以被调用。
-- 尝试从确认 `bash` 可用的标准终端运行服务器。
-- （高级）在某些 macOS 系统上，您可能需要确保 `/bin/bash` 路径存在且可用。
-
-
 ## 许可证
 
 GNU General Public License v3.0 - 详见 [LICENSE](LICENSE) 文件。
