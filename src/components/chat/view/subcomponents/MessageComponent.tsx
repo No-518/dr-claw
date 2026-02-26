@@ -1,4 +1,5 @@
 import React, { memo, useMemo } from 'react';
+import { User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import SessionProviderLogo from '../../../SessionProviderLogo';
 import type {
@@ -102,12 +103,9 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
         <div className="flex flex-col items-end w-full mb-4">
           <div className="flex items-center space-x-2 mb-1.5">
             {!isGrouped && (
-              <>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('messageTypes.user', { defaultValue: 'User' })}</span>
-                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-[10px] flex-shrink-0">
-                  U
-                </div>
-              </>
+              <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white flex-shrink-0">
+                <User className="w-3.5 h-3.5" />
+              </div>
             )}
           </div>
           <div className="bg-blue-600 text-white rounded-2xl rounded-tr-none px-4 py-2.5 shadow-sm max-w-[90%] sm:max-w-[85%]">

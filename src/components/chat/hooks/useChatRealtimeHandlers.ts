@@ -144,7 +144,7 @@ export function useChatRealtimeHandlers({
         ? (latestMessage.data as Record<string, any>)
         : null;
 
-    const globalMessageTypes = ['projects_updated', 'taskmaster-project-updated', 'session-created'];
+    const globalMessageTypes = ['projects_updated', 'taskmaster-project-updated', 'session-created', 'session-aborted'];
     const isGlobalMessage = globalMessageTypes.includes(String(latestMessage.type));
     const lifecycleMessageTypes = new Set([
       'claude-complete',
@@ -960,11 +960,13 @@ export function useChatRealtimeHandlers({
             },
           ]);
         } else {
+          clearLoadingIndicators();
+          setPendingPermissionRequests([]);
           setChatMessages((previous) => [
             ...previous,
             {
               type: 'error',
-              content: 'Stop request failed. The session is still running.',
+              content: 'Session has already finished.',
               timestamp: new Date(),
             },
           ]);

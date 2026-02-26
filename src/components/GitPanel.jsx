@@ -632,7 +632,6 @@ function GitPanel({ selectedProject, isMobile, onFileOpen }) {
       case 'M': return 'Modified';
       case 'A': return 'Added';
       case 'D': return 'Deleted';
-      case 'U': return 'Untracked';
       default: return status;
     }
   };
@@ -731,23 +730,6 @@ function GitPanel({ selectedProject, isMobile, onFileOpen }) {
                 >
                   <Trash2 className="w-3 h-3" />
                   {isMobile && <span>Discard</span>}
-                </button>
-              )}
-              {status === 'U' && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setConfirmAction({
-                      type: 'delete',
-                      file: filePath,
-                      message: `Delete untracked file "${filePath}"? This action cannot be undone.`
-                    });
-                  }}
-                  className={`${isMobile ? 'px-2 py-1 text-xs' : 'p-1'} hover:bg-destructive/10 rounded text-destructive font-medium flex items-center gap-1`}
-                  title="Delete untracked file"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  {isMobile && <span>Delete</span>}
                 </button>
               )}
               <span
@@ -1237,7 +1219,7 @@ function GitPanel({ selectedProject, isMobile, onFileOpen }) {
                 )}
               </button>
             </div>
-          ) : !gitStatus || (!gitStatus.modified?.length && !gitStatus.added?.length && !gitStatus.deleted?.length && !gitStatus.untracked?.length) ? (
+          ) : !gitStatus || (!gitStatus.modified?.length && !gitStatus.added?.length && !gitStatus.deleted?.length) ? (
             <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
               <GitCommit className="w-10 h-10 mb-2 opacity-40" />
               <p className="text-sm">No changes detected</p>
@@ -1247,7 +1229,6 @@ function GitPanel({ selectedProject, isMobile, onFileOpen }) {
               {gitStatus.modified?.map(file => renderFileItem(file, 'M'))}
               {gitStatus.added?.map(file => renderFileItem(file, 'A'))}
               {gitStatus.deleted?.map(file => renderFileItem(file, 'D'))}
-              {gitStatus.untracked?.map(file => renderFileItem(file, 'U'))}
             </div>
           )}
         </div>

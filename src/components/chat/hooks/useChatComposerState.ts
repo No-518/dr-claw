@@ -834,10 +834,23 @@ export function useChatComposerState({
     setIsTextareaExpanded(false);
   }, [resetCommandMenuState]);
 
+  const abortTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortTimeoutRef.current) {
+        clearTimeout(abortTimeoutRef.current);
+        abortTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const handleAbortSession = useCallback(() => {
     if (!canAbortSession) {
       return;
     }
+
+    setCanAbortSession(false);
 
     const pendingSessionId =
       typeof window !== 'undefined' ? sessionStorage.getItem('pendingSessionId') : null;
@@ -856,7 +869,16 @@ export function useChatComposerState({
       candidateSessionIds.find((sessionId) => Boolean(sessionId) && !isTemporarySessionId(sessionId)) || null;
 
     if (!targetSessionId) {
-      console.warn('Abort requested but no concrete session ID is available yet.');
+      setIsLoading(false);
+      setClaudeStatus(null);
+      setChatMessages((previous) => [
+        ...previous,
+        {
+          type: 'error',
+          content: 'Could not stop session: no active session found.',
+          timestamp: new Date(),
+        },
+      ]);
       return;
     }
 
@@ -865,7 +887,17 @@ export function useChatComposerState({
       sessionId: targetSessionId,
       provider,
     });
-  }, [canAbortSession, currentSessionId, pendingViewSessionRef, provider, selectedSession?.id, sendMessage]);
+
+    if (abortTimeoutRef.current) {
+      clearTimeout(abortTimeoutRef.current);
+    }
+    abortTimeoutRef.current = setTimeout(() => {
+      abortTimeoutRef.current = null;
+      setIsLoading(false);
+      setCanAbortSession(false);
+      setClaudeStatus(null);
+    }, 5000);
+  }, [canAbortSession, currentSessionId, pendingViewSessionRef, provider, selectedSession?.id, sendMessage, setCanAbortSession, setChatMessages, setClaudeStatus, setIsLoading]);
 
   const handleTranscript = useCallback((text: string) => {
     if (!text.trim()) {
