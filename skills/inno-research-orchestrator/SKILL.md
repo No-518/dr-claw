@@ -14,7 +14,7 @@ The user's entry point to the InnoFlow Research pipeline. Real users rarely prov
 
 ## Constraints
 
-- **Sandbox rule**: The agent must **only** read, write, and create files inside the current project directory (`<project_path>`). Never access, reference, or modify files outside this directory. All generated paths (`instance_path`, `references_path`, `ideas_path`, `code_references_path`, `datasets_path`, `core_code_path`, `analysis_path`, symlinks, dataset copies, etc.) must be children of `<project_path>`. If the user mentions an external path (e.g. a dataset), copy or symlink it **into** the project directory rather than operating on it in-place.
+- **Sandbox rule**: The agent must **only** read, write, and create files inside the current project directory (`<project_path>`). Never access, reference, or modify files outside this directory. Path values in `instance.json` are **absolute** when the project is created by Vibe Lab; use them as-is for file I/O. If an instance uses relative paths (e.g. hand-edited), resolve with `path.join(project_path, value)`. All generated paths (e.g. `instance`, `Ideation.references`, `Ideation.ideas`, `Experiment.code_references`, `Experiment.datasets`, `Experiment.core_code`, `Experiment.analysis`, `Publication.paper`, symlinks, dataset copies, etc.) must be children of `<project_path>`. If the user mentions an external path (e.g. a dataset), copy or symlink it **into** the project directory rather than operating on it in-place.
 
 ---
 
@@ -52,21 +52,21 @@ Based on what the user provided, classify into **plan-level** or **idea-level**:
 
 ## Step 3 — Construct standardized inputs for inno-prepare-resources
 
-`inno-prepare-resources` expects:
+`inno-prepare-resources` expects paths and fields from **`instance.json`**. When the project is created by Vibe Lab, `instance` and `Ideation.*` / `Experiment.*` / `Publication.*` are **absolute** paths; use as-is. If relative (e.g. hand-edited instance), resolve with `path.join(project_path, value)`.
 
 ```
-instance_path       : str   — path to a JSON file with source_papers, task1/task2, etc.
-task_level          : str   — "task1" (plan) or "task2" (idea)
+instance            : str   — path to instance file (absolute in Vibe Lab: <project_path>/instance.json)
+idea_maturity       : str   — "task1" (plan) or "task2" (idea), or use task_level in load_instance cache
 category            : str   — research domain tag, agent-inferred (may match a built-in metaprompt or be "custom")
-references_path     : str   — <project_path>/Ideation/references/
-ideas_path          : str   — <project_path>/Ideation/ideas/
-code_references_path: str   — <project_path>/Experiment/code_references/
-datasets_path       : str   — <project_path>/Experiment/datasets/
-core_code_path      : str   — <project_path>/Experiment/core_code/
-analysis_path       : str   — <project_path>/Experiment/analysis/
+Ideation.references : str   — path to Ideation/references (absolute in Vibe Lab)
+Ideation.ideas      : str   — path to Ideation/ideas (absolute in Vibe Lab)
+Experiment.code_references : str — path (absolute in Vibe Lab)
+Experiment.datasets : str   — path (absolute in Vibe Lab)
+Experiment.core_code: str   — path (absolute in Vibe Lab)
+Experiment.analysis : str   — path (absolute in Vibe Lab)
+Publication.paper   : str   — path (absolute in Vibe Lab)
 references          : str   — formatted string from source_papers (built by the pipeline)
 ideas               : str   — (optional, plan-mode only) the user's full plan text
-dataset_description : str   — (optional) pre-built by orchestrator when category is custom or data was user-provided
 ```
 
 ### 3a — Build or locate the instance JSON
@@ -100,7 +100,7 @@ Minimal valid instance JSON (the bare minimum the pipeline needs):
 }
 ```
 
-Save this JSON to **`<project_path>/instance.json`** (project root) and use that as `instance_path`.
+Save this JSON to **`<project_path>/instance.json`** (project root). When created by Vibe Lab, the `instance` field and all path fields are absolute; hand-edited instances may use relative paths.
 
 ### 3b — Determine category and prepare dataset
 
@@ -172,24 +172,26 @@ Compose these into a `dataset_description` string and pass it to `inno-prepare-r
 
 #### Path layout
 
-The pipeline outputs are organized into three semantic top-level folders:
+The pipeline outputs are organized into three semantic top-level folders. **Vibe Lab creates these preset directories on project creation**: Ideation/ideas, Ideation/references, Experiment/code_references, datasets, core_code, analysis, Publication/paper, Publication/homepage, Publication/slide. The orchestrator only needs to create `logs/` subdirs when writing caches. Paths in `instance.json` are **absolute** when created by Vibe Lab; use as-is, or resolve with `path.join(project_path, value)` if relative.
 
 ```
-project_path         = <current VibeLab project path>
-references_path      = <project_path>/Ideation/references/
-ideas_path           = <project_path>/Ideation/ideas/
-code_references_path = <project_path>/Experiment/code_references/
-datasets_path        = <project_path>/Experiment/datasets/
-core_code_path       = <project_path>/Experiment/core_code/
-analysis_path        = <project_path>/Experiment/analysis/
+project_path              = <current VibeLab project path>
+Ideation.references       = <project_path>/Ideation/references
+Ideation.ideas            = <project_path>/Ideation/ideas
+Experiment.code_references= <project_path>/Experiment/code_references
+Experiment.datasets       = <project_path>/Experiment/datasets
+Experiment.core_code      = <project_path>/Experiment/core_code
+Experiment.analysis        = <project_path>/Experiment/analysis
+Publication.paper         = <project_path>/Publication/paper
+Publication.homepage      = <project_path>/Publication/homepage
+Publication.slide         = <project_path>/Publication/slide
 ```
 
-If the user has an existing workspace directory, use it. Otherwise, create the full directory tree:
+If the user has an existing workspace directory, use it. Otherwise, create any missing directories. **Vibe Lab–created projects already have** instance.json and the preset dirs below; create only `logs/` subdirs when writing caches.
 
 ```
 <project_path>/
-├── instance.json                          ← project root (Research Lab UI reads this)
-├── pipeline_config.json                   ← project root (Research Lab UI reads this)
+├── instance.json                          ← project root (Research Lab UI; paths absolute in Vibe Lab)
 ├── Ideation/
 │   ├── references/
 │   │   ├── papers/                        ← arXiv downloaded papers
@@ -206,40 +208,46 @@ If the user has an existing workspace directory, use it. Otherwise, create the f
 │   │                                         judge_agent*.json
 │   └── analysis/
 │       └── logs/                          ← experiment_analysis_agent*.json
-└── Publication/                           ← placeholder for future paper generation
+└── Publication/
     ├── paper/
-    └── materials/
+    ├── homepage/
+    └── slide/
 ```
 
-Create all directories and `logs/` subdirectories immediately.
+Create any missing directories and `logs/` subdirectories when writing caches.
 
-#### Required output files at project root
+#### Required output file at project root
 
-The **Research Lab** UI reads the following files from the project root. The orchestrator **must** write them so the dashboard can display research status.
+The **Research Lab** UI reads **`instance.json`** from the project root. When **Vibe Lab creates a project**, it already writes this file and the preset dirs; paths are **absolute** (e.g. `<project_path>/Ideation/ideas`). The orchestrator **must** write or update instance.json when constructing from user input so the dashboard can display research status. Paths may be absolute (Vibe Lab default) or relative (hand-edited).
 
-| File | Location | Description |
-|------|----------|-------------|
-| `instance.json` | `<project_path>/instance.json` | The evaluation instance (source_papers, task1/task2, instance_id, url, etc.) |
-| `pipeline_config.json` | `<project_path>/pipeline_config.json` | Pipeline metadata for the current run |
-
-**`pipeline_config.json`** must contain at least:
+**`instance.json`** must contain at least (paths absolute when created by Vibe Lab):
 
 ```json
 {
-  "instance_path": "<project_path>/instance.json",
-  "task_level": "task1 or task2",
+  "instance_id": "<generated id>",
+  "idea_maturity": "task1 or task2",
+  "created_at": "<ISO date>",
+  "instance": "<project_path>/instance.json",
   "category": "<inferred category>",
-  "references_path": "<project_path>/Ideation/references/",
-  "ideas_path": "<project_path>/Ideation/ideas/",
-  "code_references_path": "<project_path>/Experiment/code_references/",
-  "datasets_path": "<project_path>/Experiment/datasets/",
-  "core_code_path": "<project_path>/Experiment/core_code/",
-  "analysis_path": "<project_path>/Experiment/analysis/",
-  "references": "<empty string, filled later by prepare step>",
-  "ideas": "<plan text if plan-mode, or empty string>",
-  "dataset_description": "<pre-built description if custom, or empty string>"
+  "Ideation": {
+    "ideas": "<project_path>/Ideation/ideas",
+    "references": "<project_path>/Ideation/references"
+  },
+  "Experiment": {
+    "code_references": "<project_path>/Experiment/code_references",
+    "datasets": "<project_path>/Experiment/datasets",
+    "core_code": "<project_path>/Experiment/core_code",
+    "analysis": "<project_path>/Experiment/analysis"
+  },
+  "Publication": {
+    "paper": "<project_path>/Publication/paper",
+    "homepage": "<project_path>/Publication/homepage",
+    "slide": "<project_path>/Publication/slide"
+  }
 }
 ```
+
+Include any instance-level fields (e.g. `source_papers`, `task2`/`task1`) at top level as needed by downstream skills. The `references` and `ideas` content strings are filled later by the prepare step; path keys above are directories (absolute in Vibe Lab–created projects).
 
 #### Cache seed file: `load_instance.json`
 
@@ -249,7 +257,7 @@ After constructing or locating the instance JSON, write the load result so downs
 {
   "name": "load_instance",
   "args": {
-    "instance_path": "<project_path>/instance.json",
+    "instance_path": "<absolute path: path.join(project_path, instance.instance)>",
     "task_level": "task1 or task2"
   },
   "result": {
@@ -266,7 +274,7 @@ After constructing or locating the instance JSON, write the load result so downs
 
 **Save** → `Ideation/references/logs/load_instance.json`
 
-All files (`instance.json`, `pipeline_config.json`, `Ideation/references/logs/load_instance.json`) must be written **before** the orchestrator presents the summary to the user.
+All files (`instance.json`, `Ideation/references/logs/load_instance.json`) must be written **before** the orchestrator presents the summary to the user.
 
 ---
 
@@ -290,15 +298,16 @@ Also remind the user of the full pipeline that will follow:
 2. inno-code-survey
 3. inno-experiment-dev (plan + implement + judge + submit)
 4. inno-experiment-analysis (analyse + refine)
-5. inno-paper-writing (draft publication-ready paper) — optional, user-triggered
+5. inno-paper-writing (draft publication-ready paper, including framework figure generation via Nanobanana SOP + Gemini CLI rendering) — optional, user-triggered
 
 **Idea-level pipeline:**
 1. inno-prepare-resources
 2. inno-idea-generation
-3. inno-code-survey (Phase A: repo acquisition + Phase B: code survey)
-4. inno-experiment-dev (plan + implement + judge + submit)
-5. inno-experiment-analysis (analyse + refine)
-6. inno-paper-writing (draft publication-ready paper) — optional, user-triggered
+3. inno-idea-eval (quality gate: multi-persona evaluation)
+4. inno-code-survey (Phase A: repo acquisition + Phase B: code survey)
+5. inno-experiment-dev (plan + implement + judge + submit)
+6. inno-experiment-analysis (analyse + refine)
+7. inno-paper-writing (draft publication-ready paper, including framework figure generation via Nanobanana SOP + Gemini CLI rendering) — optional, user-triggered
 
 The user may then say "proceed", "run prepare", or manually invoke `inno-prepare-resources`.
 
@@ -346,7 +355,7 @@ The user may then say "proceed", "run prepare", or manually invoke `inno-prepare
 > User: "Run the pipeline on `/home/dingjie/.../nlp_qa/nlp_qa_1.json` with task2."
 
 **Orchestrator actions:**
-1. `instance_path` = provided path → read file directly
+1. Read instance from provided path (resolve relative to project if needed); use as `instance` and paths from it
 2. `task_level = "task2"` → **idea-level**
 3. Agent infers category from path → `nlp_qa`
 4. Present summary to user, wait for confirmation before next step
@@ -395,4 +404,4 @@ The user may then say "proceed", "run prepare", or manually invoke `inno-prepare
 
 - Instance JSON schema: `{"source_papers": [...], "task1": "...", "task2": "...", "instance_id": "...", "url": "..."}`
 - Category → dataset mapping: built-in categories ship with a `metaprompt.py` providing `TASK`, `DATASET`, `BASELINE`, `COMPARISON`, `EVALUATION`
-- Downstream skills: `inno-prepare-resources`, `inno-idea-generation`, `inno-code-survey` (Phase A: repo acquisition + Phase B: code survey), `inno-experiment-dev` (plan + implement + judge + submit), `inno-experiment-analysis` (analyse + refine), `inno-paper-writing` (draft publication-ready paper)
+- Downstream skills: `inno-prepare-resources`, `inno-idea-generation`, `inno-idea-eval` (multi-persona quality gate), `inno-code-survey` (Phase A: repo acquisition + Phase B: code survey), `inno-experiment-dev` (plan + implement + judge + submit), `inno-experiment-analysis` (analyse + refine), `inno-paper-writing` (draft publication-ready paper)

@@ -35,12 +35,8 @@ export default function SidebarHeader({
 }: SidebarHeaderProps) {
   const LogoBlock = () => (
     <div className="flex items-center gap-2.5 min-w-0">
-      <div className="w-7 h-7 bg-primary/90 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
-        <svg className="w-3.5 h-3.5 text-primary-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      </div>
-      <h1 className="text-sm font-semibold text-foreground tracking-tight truncate">{t('app.title')}</h1>
+      <img src="/logo.svg" alt="Vibe Lab" className="w-7 h-7 rounded-lg shadow-sm flex-shrink-0" />
+      <h1 className="text-[15px] font-bold text-foreground tracking-tight truncate">{t('app.title')}</h1>
     </div>
   );
 
@@ -49,12 +45,12 @@ export default function SidebarHeader({
       {/* Desktop header */}
       <div
         className="hidden md:block px-3 pt-3 pb-2"
-        style={isPWA && isMobile ? { paddingTop: '44px' } : {}}
+        style={{}}
       >
         <div className="flex items-center justify-between gap-2">
           {IS_PLATFORM ? (
             <a
-              href="https://cloudcli.ai/dashboard"
+              href="https://github.com/OpenLAIR/VibeLab"
               className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity"
               title={t('tooltips.viewEnvironments')}
             >
@@ -134,7 +130,7 @@ export default function SidebarHeader({
         <div className="flex items-center justify-between">
           {IS_PLATFORM ? (
             <a
-              href="https://cloudcli.ai/dashboard"
+              href="https://github.com/OpenLAIR/VibeLab"
               className="flex items-center gap-2.5 active:opacity-70 transition-opacity min-w-0"
               title={t('tooltips.viewEnvironments')}
             >

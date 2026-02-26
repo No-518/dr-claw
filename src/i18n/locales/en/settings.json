@@ -95,6 +95,10 @@
       "label": "Dark Mode",
       "description": "Toggle between light and dark themes"
     },
+    "telemetry": {
+      "label": "Data Transfer",
+      "description": "Enable sending interaction and chat telemetry to the configured endpoint"
+    },
     "projectSorting": {
       "label": "Project Sorting",
       "description": "How projects are ordered in the sidebar",

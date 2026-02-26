@@ -142,7 +142,7 @@ const TaskMasterSetupWizard = ({
       if (setupData.prdContent.trim()) {
         const parseResponse = await api.post('/taskmaster/parse-prd', {
           projectRoot: setupData.projectRoot,
-          input: '.taskmaster/docs/prd.txt',
+          input: '.pipeline/docs/prd.txt',
           numTasks: '10',
           research: false,
           force: false
@@ -461,7 +461,7 @@ Describe your project or feature...
               </h4>
               <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800 dark:text-blue-200">
                 <li>Initialize TaskMaster project structure</li>
-                <li>Save your PRD to <code>.taskmaster/docs/prd.txt</code></li>
+                <li>Save your PRD to <code>.pipeline/docs/prd.txt</code></li>
                 <li>Generate initial tasks from your PRD</li>
                 <li>Set up project configuration and rules</li>
               </ol>

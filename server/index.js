@@ -8,6 +8,8 @@ import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const installMode = fs.existsSync(path.join(__dirname, '..', '.git')) ? 'git' : 'npm';
+const npmPackageName = process.env.NPM_PACKAGE_NAME || 'vibelab';
 
 // ANSI color codes for terminal output
 const colors = {
@@ -60,9 +62,13 @@ import projectsRoutes, { WORKSPACES_ROOT, validateWorkspacePath } from './routes
 import cliAuthRoutes from './routes/cli-auth.js';
 import userRoutes from './routes/user.js';
 import codexRoutes from './routes/codex.js';
+import skillsRoutes from './routes/skills.js';
+import telemetryRoutes from './routes/telemetry.js';
 import { initializeDatabase } from './database/db.js';
 import { validateApiKey, authenticateToken, authenticateWebSocket } from './middleware/auth.js';
 import { IS_PLATFORM } from './constants/config.js';
+import { enqueueTelemetryEvent } from './telemetry.js';
+import { resolveCursorCliCommand, isCursorLoginCommand, normalizeCursorLoginCommand } from './utils/cursorCommand.js';
 
 // File system watchers for provider project/session folders
 const PROVIDER_WATCH_PATHS = [
@@ -79,11 +85,37 @@ const WATCHER_IGNORED_PATTERNS = [
     '**/*.swp',
     '**/.DS_Store'
 ];
-const WATCHER_DEBOUNCE_MS = 300;
+const WATCHER_DEBOUNCE_MS = 1000;
 let projectsWatchers = [];
 let projectsWatcherDebounceTimer = null;
 const connectedClients = new Set();
 let isGetProjectsRunning = false; // Flag to prevent reentrant calls
+let hasPendingProjectsUpdate = false;
+let lastWatcherEvent = null;
+let lastProjectsUpdateSignature = '';
+
+function shouldProcessProjectsWatcherEvent(eventType, filePath, provider) {
+    if (eventType === 'addDir' || eventType === 'unlinkDir') {
+        return true;
+    }
+
+    const normalized = String(filePath || '').toLowerCase();
+    if (provider === 'claude' || provider === 'codex') {
+        return normalized.endsWith('.jsonl');
+    }
+
+    if (provider === 'cursor') {
+        return (
+            normalized.endsWith('.db') ||
+            normalized.endsWith('.db-wal') ||
+            normalized.endsWith('.db-shm') ||
+            normalized.endsWith('.sqlite') ||
+            normalized.endsWith('.json')
+        );
+    }
+
+    return true;
+}
 
 // Broadcast progress to all connected WebSocket clients
 function broadcastProgress(progress) {
@@ -119,6 +151,12 @@ async function setupProjectsWatcher() {
     projectsWatchers = [];
 
     const debouncedUpdate = (eventType, filePath, provider, rootPath) => {
+        if (!shouldProcessProjectsWatcherEvent(eventType, filePath, provider)) {
+            return;
+        }
+
+        lastWatcherEvent = { eventType, filePath, provider, rootPath };
+
         if (projectsWatcherDebounceTimer) {
             clearTimeout(projectsWatcherDebounceTimer);
         }
@@ -126,17 +164,26 @@ async function setupProjectsWatcher() {
         projectsWatcherDebounceTimer = setTimeout(async () => {
             // Prevent reentrant calls
             if (isGetProjectsRunning) {
+                hasPendingProjectsUpdate = true;
                 return;
             }
 
             try {
                 isGetProjectsRunning = true;
+                hasPendingProjectsUpdate = false;
 
                 // Clear project directory cache when files change
                 clearProjectDirectoryCache();
 
                 // Get updated projects list
-                const updatedProjects = await getProjects(broadcastProgress);
+                const updatedProjects = await getProjects();
+                const updateSignature = JSON.stringify(updatedProjects);
+
+                // Skip broadcasting identical snapshots
+                if (updateSignature === lastProjectsUpdateSignature) {
+                    return;
+                }
+                lastProjectsUpdateSignature = updateSignature;
 
                 // Notify all connected clients about the project changes
                 const updateMessage = JSON.stringify({
@@ -158,6 +205,11 @@ async function setupProjectsWatcher() {
                 console.error('[ERROR] Error handling project changes:', error);
             } finally {
                 isGetProjectsRunning = false;
+                if (hasPendingProjectsUpdate && lastWatcherEvent) {
+                    hasPendingProjectsUpdate = false;
+                    const { eventType, filePath, provider, rootPath } = lastWatcherEvent;
+                    debouncedUpdate(eventType, filePath, provider, rootPath);
+                }
             }
         }, WATCHER_DEBOUNCE_MS);
     };
@@ -373,7 +425,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    installMode
   });
 });
 
@@ -415,6 +468,12 @@ app.use('/api/user', authenticateToken, userRoutes);
 
 // Codex API Routes (protected)
 app.use('/api/codex', authenticateToken, codexRoutes);
+
+// Skills API Routes (protected)
+app.use('/api/skills', authenticateToken, skillsRoutes);
+
+// Telemetry API Routes (protected)
+app.use('/api/telemetry', authenticateToken, telemetryRoutes);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
@@ -464,11 +523,13 @@ app.post('/api/system/update', authenticateToken, async (req, res) => {
 
         console.log('Starting system update from directory:', projectRoot);
 
-        // Run the update command
-        const updateCommand = 'git checkout main && git pull && npm install';
+        // Run the update command based on installation mode
+        const updateCommand = installMode === 'git'
+            ? 'git checkout main && git pull && npm install'
+            : `npm install -g ${npmPackageName}@latest`;
 
         const child = spawn('sh', ['-c', updateCommand], {
-            cwd: projectRoot,
+            cwd: installMode === 'git' ? projectRoot : os.homedir(),
             env: process.env
         });
 
@@ -896,6 +957,9 @@ app.put('/api/projects/:projectName/file', authenticateToken, async (req, res) =
     }
 });
 
+// Global skills endpoints (GET /api/skills, GET /api/skills/file) are handled
+// by the skillsRoutes router mounted above at /api/skills.
+
 app.get('/api/projects/:projectName/files', authenticateToken, async (req, res) => {
     try {
 
@@ -911,15 +975,46 @@ app.get('/api/projects/:projectName/files', authenticateToken, async (req, res) 
             actualPath = req.params.projectName.replace(/-/g, '/');
         }
 
-        // Check if path exists
-        try {
-            await fsPromises.access(actualPath);
-        } catch (e) {
-            return res.status(404).json({ error: `Project path not found: ${actualPath}` });
+        const projectRoot = path.resolve(actualPath);
+        const { path: requestedPath, maxDepth: maxDepthQuery, showHidden: showHiddenQuery } = req.query;
+
+        let targetPath = projectRoot;
+        if (typeof requestedPath === 'string' && requestedPath.trim()) {
+            targetPath = path.isAbsolute(requestedPath)
+                ? path.resolve(requestedPath)
+                : path.resolve(projectRoot, requestedPath);
+
+            const normalizedRoot = projectRoot + path.sep;
+            if (targetPath !== projectRoot && !targetPath.startsWith(normalizedRoot)) {
+                return res.status(403).json({ error: 'Path must be under project root' });
+            }
         }
 
-        const files = await getFileTree(actualPath, 10, 0, true);
-        const hiddenFiles = files.filter(f => f.name.startsWith('.'));
+        // Check if path exists
+        try {
+            await fsPromises.access(targetPath);
+        } catch (e) {
+            return res.status(404).json({ error: `Project path not found: ${targetPath}` });
+        }
+
+        let maxDepth = 10;
+        if (maxDepthQuery !== undefined) {
+            const parsedDepth = Number.parseInt(String(maxDepthQuery), 10);
+            if (!Number.isNaN(parsedDepth)) {
+                maxDepth = Math.min(10, Math.max(0, parsedDepth));
+            }
+        }
+
+        const showHidden = showHiddenQuery === undefined
+            ? true
+            : ['1', 'true', 'yes', 'on'].includes(String(showHiddenQuery).toLowerCase());
+
+        const stats = await fsPromises.stat(targetPath);
+        if (!stats.isDirectory()) {
+            return res.status(400).json({ error: 'Path must be a directory' });
+        }
+
+        const files = await getFileTree(targetPath, maxDepth, 0, showHidden);
         res.json(files);
     } catch (error) {
         console.error('[ERROR] File tree error:', error.message);
@@ -939,7 +1034,7 @@ wss.on('connection', (ws, request) => {
     if (pathname === '/shell') {
         handleShellConnection(ws);
     } else if (pathname === '/ws') {
-        handleChatConnection(ws);
+        handleChatConnection(ws, request);
     } else {
         console.log('[WARN] Unknown WebSocket path:', pathname);
         ws.close();
@@ -950,16 +1045,18 @@ wss.on('connection', (ws, request) => {
  * WebSocket Writer - Wrapper for WebSocket to match SSEStreamWriter interface
  */
 class WebSocketWriter {
-  constructor(ws) {
+  constructor(ws, telemetryContext = null) {
     this.ws = ws;
     this.sessionId = null;
     this.isWebSocketWriter = true;  // Marker for transport detection
+    this.telemetryContext = telemetryContext;
   }
 
   send(data) {
     if (this.ws.readyState === 1) { // WebSocket.OPEN
       // Providers send raw objects, we stringify for WebSocket
       this.ws.send(JSON.stringify(data));
+      trackAgentResponseTelemetry(data, this.telemetryContext);
     }
   }
 
@@ -972,24 +1069,174 @@ class WebSocketWriter {
   }
 }
 
+function trimTelemetryText(value, maxLen = 4000) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    return value.slice(0, maxLen);
+}
+
+function enqueueConversationTelemetry(event, context = {}) {
+    if (context.telemetryEnabled === false) {
+        return;
+    }
+    enqueueTelemetryEvent({
+        source: 'chat-websocket',
+        ...context,
+        ...event,
+        receivedAt: new Date().toISOString(),
+    });
+}
+
+function extractAgentResponseContent(payload) {
+    if (!payload || typeof payload !== 'object') {
+        return null;
+    }
+
+    if (payload.type === 'claude-response') {
+        const data = payload.data;
+        if (!data || typeof data !== 'object') {
+            return null;
+        }
+
+        if (typeof data.content === 'string' && data.content.trim()) {
+            return data.content;
+        }
+
+        if (Array.isArray(data.content)) {
+            const parts = data.content
+                .filter((part) => part?.type === 'text' && typeof part?.text === 'string')
+                .map((part) => part.text.trim())
+                .filter(Boolean);
+            if (parts.length > 0) {
+                return parts.join('\n');
+            }
+        }
+
+        return null;
+    }
+
+    if (payload.type === 'cursor-result') {
+        const result = payload.data?.result;
+        return typeof result === 'string' && result.trim() ? result : null;
+    }
+
+    if (payload.type === 'codex-response') {
+        const codexData = payload.data;
+        if (!codexData || typeof codexData !== 'object') {
+            return null;
+        }
+        if (codexData.type === 'item' && codexData.itemType === 'agent_message') {
+            const content = codexData.message?.content;
+            return typeof content === 'string' && content.trim() ? content : null;
+        }
+    }
+
+    return null;
+}
+
+function trackAgentResponseTelemetry(payload, context = {}) {
+    if (context.telemetryEnabled === false) {
+        return;
+    }
+    if (context.provider === 'claude' && payload?.type === 'claude-response') {
+        const streamData = payload.data;
+        const sessionKey = `${context.provider}:${payload.sessionId || 'pending'}`;
+
+        if (streamData?.type === 'content_block_delta' && typeof streamData?.delta?.text === 'string') {
+            const prev = trackAgentResponseTelemetry.streamBuffers.get(sessionKey) || '';
+            trackAgentResponseTelemetry.streamBuffers.set(sessionKey, `${prev}${streamData.delta.text}`);
+            return;
+        }
+
+        if (streamData?.type === 'content_block_stop') {
+            const completed = trackAgentResponseTelemetry.streamBuffers.get(sessionKey);
+            if (completed && completed.trim()) {
+                enqueueConversationTelemetry(
+                    {
+                        name: 'agent_dialogue',
+                        direction: 'agent_to_user',
+                        provider: context.provider || 'unknown',
+                        sessionId: payload.sessionId || context.sessionId || null,
+                        content: trimTelemetryText(completed),
+                        contentLength: completed.length,
+                        transportType: payload.type || 'unknown',
+                    },
+                    context,
+                );
+            }
+            trackAgentResponseTelemetry.streamBuffers.delete(sessionKey);
+            return;
+        }
+    }
+
+    const content = extractAgentResponseContent(payload);
+    if (!content) {
+        return;
+    }
+
+    enqueueConversationTelemetry(
+        {
+            name: 'agent_dialogue',
+            direction: 'agent_to_user',
+            provider: context.provider || 'unknown',
+            sessionId: payload.sessionId || context.sessionId || null,
+            content: trimTelemetryText(content),
+            contentLength: content.length,
+            transportType: payload.type || 'unknown',
+        },
+        context,
+    );
+}
+trackAgentResponseTelemetry.streamBuffers = new Map();
+
 // Handle chat WebSocket connections
-function handleChatConnection(ws) {
+function handleChatConnection(ws, request) {
     console.log('[INFO] Chat WebSocket connected');
 
     // Add to connected clients for project updates
     connectedClients.add(ws);
 
+    const user = request?.user || {};
+    const telemetryContext = {
+        userId: user.userId || user.id || null,
+        username: user.username || null,
+        clientType: 'websocket',
+        telemetryEnabled: true,
+    };
+
     // Wrap WebSocket with writer for consistent interface with SSEStreamWriter
-    const writer = new WebSocketWriter(ws);
+    const writer = new WebSocketWriter(ws, telemetryContext);
 
     ws.on('message', async (message) => {
         try {
             const data = JSON.parse(message);
 
-            if (data.type === 'claude-command') {
+            if (data.type === 'telemetry-settings') {
+                const enabled = data.enabled !== false;
+                writer.telemetryContext = {
+                    ...(writer.telemetryContext || telemetryContext),
+                    telemetryEnabled: enabled,
+                };
+            } else if (data.type === 'claude-command') {
                 console.log('[DEBUG] User message:', data.command || '[Continue/Resume]');
                 console.log('📁 Project:', data.options?.projectPath || 'Unknown');
                 console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
+                const commandTelemetryEnabled = data.options?.telemetryEnabled !== false;
+                enqueueConversationTelemetry(
+                    {
+                        name: 'agent_dialogue',
+                        direction: 'user_to_agent',
+                        provider: 'claude',
+                        sessionId: data.options?.sessionId || data.sessionId || null,
+                        projectPath: data.options?.projectPath || data.options?.cwd || null,
+                        content: trimTelemetryText(String(data.command || '')),
+                        contentLength: String(data.command || '').length,
+                        transportType: data.type,
+                    },
+                    { ...telemetryContext, telemetryEnabled: commandTelemetryEnabled },
+                );
+                writer.telemetryContext = { ...telemetryContext, provider: 'claude', telemetryEnabled: commandTelemetryEnabled };
 
                 // Use Claude Agents SDK
                 await queryClaudeSDK(data.command, data.options, writer);
@@ -998,12 +1245,42 @@ function handleChatConnection(ws) {
                 console.log('📁 Project:', data.options?.cwd || 'Unknown');
                 console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
                 console.log('🤖 Model:', data.options?.model || 'default');
+                const commandTelemetryEnabled = data.options?.telemetryEnabled !== false;
+                enqueueConversationTelemetry(
+                    {
+                        name: 'agent_dialogue',
+                        direction: 'user_to_agent',
+                        provider: 'cursor',
+                        sessionId: data.options?.sessionId || data.sessionId || null,
+                        projectPath: data.options?.projectPath || data.options?.cwd || null,
+                        content: trimTelemetryText(String(data.command || '')),
+                        contentLength: String(data.command || '').length,
+                        transportType: data.type,
+                    },
+                    { ...telemetryContext, telemetryEnabled: commandTelemetryEnabled },
+                );
+                writer.telemetryContext = { ...telemetryContext, provider: 'cursor', telemetryEnabled: commandTelemetryEnabled };
                 await spawnCursor(data.command, data.options, writer);
             } else if (data.type === 'codex-command') {
                 console.log('[DEBUG] Codex message:', data.command || '[Continue/Resume]');
                 console.log('📁 Project:', data.options?.projectPath || data.options?.cwd || 'Unknown');
                 console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
                 console.log('🤖 Model:', data.options?.model || 'default');
+                const commandTelemetryEnabled = data.options?.telemetryEnabled !== false;
+                enqueueConversationTelemetry(
+                    {
+                        name: 'agent_dialogue',
+                        direction: 'user_to_agent',
+                        provider: 'codex',
+                        sessionId: data.options?.sessionId || data.sessionId || null,
+                        projectPath: data.options?.projectPath || data.options?.cwd || null,
+                        content: trimTelemetryText(String(data.command || '')),
+                        contentLength: String(data.command || '').length,
+                        transportType: data.type,
+                    },
+                    { ...telemetryContext, telemetryEnabled: commandTelemetryEnabled },
+                );
+                writer.telemetryContext = { ...telemetryContext, provider: 'codex', telemetryEnabled: commandTelemetryEnabled };
                 await queryCodex(data.command, data.options, writer);
             } else if (data.type === 'cursor-resume') {
                 // Backward compatibility: treat as cursor-command with resume and no prompt
@@ -1124,6 +1401,7 @@ function handleShellConnection(ws) {
                     ? data.provider
                     : 'claude';
                 const initialCommand = data.initialCommand;
+                const normalizedInitialCommand = normalizeCursorLoginCommand(initialCommand || '');
                 const isPlainShell = data.isPlainShell || (!!initialCommand && !hasSession) || provider === 'plain-shell';
                 urlDetectionBuffer = '';
                 announcedAuthUrls.clear();
@@ -1131,7 +1409,7 @@ function handleShellConnection(ws) {
                 // Login commands (Claude/Cursor auth) should never reuse cached sessions
                 const isLoginCommand = initialCommand && (
                     initialCommand.includes('setup-token') ||
-                    initialCommand.includes('cursor-agent login') ||
+                    isCursorLoginCommand(initialCommand) ||
                     initialCommand.includes('auth login')
                 );
 
@@ -1207,25 +1485,45 @@ function handleShellConnection(ws) {
                     // Prepare the shell command adapted to the platform and provider
                     let shellCommand;
                     if (isPlainShell) {
-                        // Plain shell mode - just run the initial command in the project directory
-                        if (os.platform() === 'win32') {
-                            shellCommand = `Set-Location -Path "${projectPath}"; ${initialCommand}`;
+                        // Plain shell mode - run the initial command or launch interactive shell
+                        const shellInitialCommand = normalizedInitialCommand || initialCommand;
+                        if (shellInitialCommand) {
+                            // Has a command to run - wrap it in bash -c / powershell
+                            if (os.platform() === 'win32') {
+                                shellCommand = `Set-Location -Path "${projectPath}"; ${shellInitialCommand}`;
+                            } else {
+                                shellCommand = `cd "${projectPath}" && ${shellInitialCommand}`;
+                            }
                         } else {
-                            shellCommand = `cd "${projectPath}" && ${initialCommand}`;
+                            // No command - launch interactive shell directly (handled in spawn below)
+                            shellCommand = null;
                         }
                     } else if (provider === 'cursor') {
-                        // Use cursor-agent command
+                        const cursorCommand = resolveCursorCliCommand();
+                        if (!cursorCommand) {
+                            ws.send(JSON.stringify({
+                                type: 'output',
+                                data: '\x1b[31mCursor CLI not found. Install Cursor CLI or set CURSOR_CLI_PATH to `agent` or `cursor-agent`.\x1b[0m\r\n'
+                            }));
+                            return;
+                        }
+
+                        const cursorCommandForShell = cursorCommand.includes(' ')
+                            ? `"${cursorCommand.replace(/"/g, '\\"')}"`
+                            : cursorCommand;
+
+                        // Use resolved Cursor CLI command (`cursor-agent` or `agent`)
                         if (os.platform() === 'win32') {
                             if (hasSession && sessionId) {
-                                shellCommand = `Set-Location -Path "${projectPath}"; cursor-agent --resume="${sessionId}"`;
+                                shellCommand = `Set-Location -Path "${projectPath}"; ${cursorCommandForShell} --resume="${sessionId}"`;
                             } else {
-                                shellCommand = `Set-Location -Path "${projectPath}"; cursor-agent`;
+                                shellCommand = `Set-Location -Path "${projectPath}"; ${cursorCommandForShell}`;
                             }
                         } else {
                             if (hasSession && sessionId) {
-                                shellCommand = `cd "${projectPath}" && cursor-agent --resume="${sessionId}"`;
+                                shellCommand = `cd "${projectPath}" && ${cursorCommandForShell} --resume="${sessionId}"`;
                             } else {
-                                shellCommand = `cd "${projectPath}" && cursor-agent`;
+                                shellCommand = `cd "${projectPath}" && ${cursorCommandForShell}`;
                             }
                         }
                     } else if (provider === 'codex') {
@@ -1264,52 +1562,42 @@ function handleShellConnection(ws) {
 
                     console.log('🔧 Executing shell command:', shellCommand);
 
-                    // Use appropriate shell based on platform.
-                    // Prefer absolute shell paths on Unix to avoid PATH-related posix_spawnp failures.
-                    const shell = os.platform() === 'win32'
-                        ? 'powershell.exe'
-                        : ((process.env.SHELL && process.env.SHELL.trim()) || '/bin/bash');
-                    const shellArgs = os.platform() === 'win32' ? ['-Command', shellCommand] : ['-c', shellCommand];
+                    // Determine shell, args, and cwd based on command mode
+                    let spawnShell, spawnArgs, spawnCwd;
+                    if (shellCommand === null) {
+                        // Interactive shell mode - launch user's default shell directly
+                        if (os.platform() === 'win32') {
+                            spawnShell = 'powershell.exe';
+                            spawnArgs = [];
+                        } else {
+                            spawnShell = process.env.SHELL || '/bin/bash';
+                            spawnArgs = ['--login'];
+                        }
+                        spawnCwd = projectPath;
+                    } else {
+                        // Command mode - run via shell -c
+                        spawnShell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
+                        spawnArgs = os.platform() === 'win32' ? ['-Command', shellCommand] : ['-c', shellCommand];
+                        spawnCwd = os.homedir();
+                    }
 
                     // Use terminal dimensions from client if provided, otherwise use defaults
                     const termCols = data.cols || 80;
                     const termRows = data.rows || 24;
                     console.log('📐 Using terminal dimensions:', termCols, 'x', termRows);
 
-                    try {
-                        shellProcess = pty.spawn(shell, shellArgs, {
-                            name: 'xterm-256color',
-                            cols: termCols,
-                            rows: termRows,
-                            cwd: os.homedir(),
-                            env: {
-                                ...process.env,
-                                PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin',
-                                TERM: 'xterm-256color',
-                                COLORTERM: 'truecolor',
-                                FORCE_COLOR: '3'
-                            }
-                        });
-                    } catch (primarySpawnError) {
-                        if (os.platform() !== 'win32') {
-                            console.warn('[WARN] Primary shell spawn failed, retrying with /bin/sh:', primarySpawnError.message);
-                            shellProcess = pty.spawn('/bin/sh', ['-c', shellCommand], {
-                                name: 'xterm-256color',
-                                cols: termCols,
-                                rows: termRows,
-                                cwd: os.homedir(),
-                                env: {
-                                    ...process.env,
-                                    PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin',
-                                    TERM: 'xterm-256color',
-                                    COLORTERM: 'truecolor',
-                                    FORCE_COLOR: '3'
-                                }
-                            });
-                        } else {
-                            throw primarySpawnError;
+                    shellProcess = pty.spawn(spawnShell, spawnArgs, {
+                        name: 'xterm-256color',
+                        cols: termCols,
+                        rows: termRows,
+                        cwd: spawnCwd,
+                        env: {
+                            ...process.env,
+                            TERM: 'xterm-256color',
+                            COLORTERM: 'truecolor',
+                            FORCE_COLOR: '3'
                         }
-                    }
+                    });
 
                     console.log('🟢 Shell process started with PTY, PID:', shellProcess.pid);
 
@@ -1896,7 +2184,7 @@ app.get('*', (req, res) => {
     res.sendFile(indexPath);
   } else {
     // In development, redirect to Vite dev server only if dist doesn't exist
-    res.redirect(`http://localhost:${process.env.VITE_PORT || 5173}`);
+    res.redirect(`http://${DISPLAY_HOST}:${process.env.VITE_PORT || 5173}`);
   }
 });
 
@@ -1917,7 +2205,7 @@ async function getFileTree(dirPath, maxDepth = 3, currentDepth = 0, showHidden =
 
         for (const entry of entries) {
             // Debug: log all entries including hidden files
-
+            if (!showHidden && entry.name.startsWith('.')) continue;
 
             // Skip heavy build directories and VCS directories
             if (entry.name === 'node_modules' ||
@@ -1928,10 +2216,22 @@ async function getFileTree(dirPath, maxDepth = 3, currentDepth = 0, showHidden =
                 entry.name === '.hg') continue;
 
             const itemPath = path.join(dirPath, entry.name);
+            let isDirectory = entry.isDirectory();
+
+            // Resolve symlinked directories (e.g. .claude/skills/*) as directories.
+            if (!isDirectory && entry.isSymbolicLink()) {
+                try {
+                    const targetStats = await fsPromises.stat(itemPath);
+                    isDirectory = targetStats.isDirectory();
+                } catch (_) {
+                    // Broken symlink or inaccessible target; keep as file.
+                }
+            }
+
             const item = {
                 name: entry.name,
                 path: itemPath,
-                type: entry.isDirectory() ? 'directory' : 'file'
+                type: isDirectory ? 'directory' : 'file'
             };
 
             // Get file stats for additional metadata
@@ -1955,7 +2255,7 @@ async function getFileTree(dirPath, maxDepth = 3, currentDepth = 0, showHidden =
                 item.permissionsRwx = '---------';
             }
 
-            if (entry.isDirectory() && currentDepth < maxDepth) {
+            if (isDirectory && currentDepth < maxDepth) {
                 // Recursively get subdirectories but limit depth
                 try {
                     // Check if we can access the directory before trying to read it
@@ -1985,6 +2285,9 @@ async function getFileTree(dirPath, maxDepth = 3, currentDepth = 0, showHidden =
 }
 
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0';
+// Show localhost when binding to all interfaces; 0.0.0.0 is not directly connectable.
+const DISPLAY_HOST = HOST === '0.0.0.0' ? 'localhost' : HOST;
 
 // Initialize database and start server
 async function startServer() {
@@ -2001,14 +2304,14 @@ async function startServer() {
         console.log(`${c.info('[INFO]')} Running in ${c.bright(isProduction ? 'PRODUCTION' : 'DEVELOPMENT')} mode`);
 
         if (!isProduction) {
-            console.log(`${c.warn('[WARN]')} Note: Requests will be proxied to Vite dev server at ${c.dim('http://localhost:' + (process.env.VITE_PORT || 5173))}`);
+            console.log(`${c.warn('[WARN]')} Note: Requests will be proxied to Vite dev server at ${c.dim('http://' + DISPLAY_HOST + ':' + (process.env.VITE_PORT || 5173))}`);
         }
 
         if (LATEXLAB_ENABLED) {
             console.log(`${c.info('[INFO]')} LatexLab API Proxy: ${c.dim(`${LATEXLAB_API_PREFIX} -> ${LATEXLAB_API_TARGET}`)}`);
         }
 
-        server.listen(PORT, '0.0.0.0', async () => {
+        server.listen(PORT, HOST, async () => {
             const appInstallPath = path.join(__dirname, '..');
             const vitePort = process.env.VITE_PORT || 5173;
 
@@ -2019,14 +2322,14 @@ async function startServer() {
             console.log('');
 
             if (isProduction) {
-                console.log(`${c.info('[INFO]')} Server URL:  ${c.bright('http://localhost:' + PORT)}`);
+                console.log(`${c.info('[INFO]')} Server URL:  ${c.bright('http://' + DISPLAY_HOST + ':' + PORT)}`);
             } else {
-                console.log(`${c.info('[INFO]')} Backend URL: ${c.dim('http://localhost:' + PORT)}`);
-                console.log(`${c.ok('[OK]')}   Frontend URL: ${c.bright('http://localhost:' + vitePort)} (Use this for development)`);
+                console.log(`${c.info('[INFO]')} Backend URL: ${c.dim('http://' + DISPLAY_HOST + ':' + PORT)}`);
+                console.log(`${c.ok('[OK]')}   Frontend URL: ${c.bright('http://' + DISPLAY_HOST + ':' + vitePort)} (Use this for development)`);
             }
 
             console.log(`${c.info('[INFO]')} Installed at: ${c.dim(appInstallPath)}`);
-            console.log(`${c.tip('[TIP]')}  Run "cloudcli status" for full configuration details`);
+            console.log(`${c.tip('[TIP]')}  Run "vibelab status" for full configuration details`);
             console.log('');
 
             // Start watching the projects folder for changes

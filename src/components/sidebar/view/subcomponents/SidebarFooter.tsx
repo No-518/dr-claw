@@ -20,7 +20,7 @@ export default function SidebarFooter({
   t,
 }: SidebarFooterProps) {
   return (
-    <div className="flex-shrink-0">
+    <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}>
       {/* Update banner */}
       {updateAvailable && (
         <>
@@ -78,8 +78,8 @@ export default function SidebarFooter({
           className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
           onClick={onShowSettings}
         >
-          <Settings className="w-3.5 h-3.5" />
-          <span className="text-xs">{t('actions.settings')}</span>
+          <Settings className="w-4 h-4" />
+          <span className="text-[14px] font-medium">{t('actions.settings')}</span>
         </button>
       </div>
 

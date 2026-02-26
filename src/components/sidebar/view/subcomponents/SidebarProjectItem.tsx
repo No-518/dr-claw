@@ -313,10 +313,10 @@ export default function SidebarProjectItem({
                 </div>
               ) : (
                 <div>
-                  <div className="text-sm font-semibold truncate text-foreground" title={project.displayName}>
+                  <div className="text-[14px] font-semibold truncate text-foreground" title={project.displayName}>
                     {project.displayName}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-[11px] text-muted-foreground">
                     {sessionCountDisplay}
                     {project.fullPath !== project.displayName && (
                       <span className="ml-1 opacity-60" title={project.fullPath}>

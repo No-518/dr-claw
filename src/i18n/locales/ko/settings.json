@@ -95,6 +95,10 @@
       "label": "다크 모드",
       "description": "라이트/다크 테마 전환"
     },
+    "telemetry": {
+      "label": "데이터 전송",
+      "description": "활성화하면 UI 상호작용 및 대화 텔레메트리를 설정된 엔드포인트로 전송합니다"
+    },
     "projectSorting": {
       "label": "프로젝트 정렬",
       "description": "사이드바에서 프로젝트 정렬 방식",

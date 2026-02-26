@@ -209,17 +209,17 @@ export const OneLineDisplay: React.FC<OneLineDisplayProps> = ({
 
   // Default one-line style
   return (
-    <div className={`group flex items-center gap-1.5 ${colorScheme.background || ''} border-l-2 ${colorScheme.border} pl-3 py-0.5 my-0.5`}>
+    <div className={`group flex items-center gap-1.5 ${colorScheme.background || ''} border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-1.5 my-2 shadow-sm bg-white dark:bg-gray-900/50`}>
       {icon && icon !== 'terminal' && (
-        <span className={`${colorScheme.icon} flex-shrink-0 text-xs`}>{icon}</span>
+        <span className={`${colorScheme.icon} flex-shrink-0 text-[13px]`}>{icon}</span>
       )}
       {!icon && (label || toolName) && (
-        <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{label || toolName}</span>
+        <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">{label || toolName}</span>
       )}
       {(icon || label || toolName) && (
-        <span className="text-gray-300 dark:text-gray-600 text-[10px]">/</span>
+        <span className="text-gray-300 dark:text-gray-700 text-[10px] flex-shrink-0 mx-0.5">|</span>
       )}
-      <span className={`text-xs font-mono ${wrapText ? 'whitespace-pre-wrap break-all' : 'truncate'} flex-1 min-w-0 ${colorScheme.primary}`}>
+      <span className={`text-[13px] font-mono ${wrapText ? 'whitespace-pre-wrap break-all' : 'truncate'} flex-1 min-w-0 ${colorScheme.primary}`}>
         {value}
       </span>
       {secondary && (

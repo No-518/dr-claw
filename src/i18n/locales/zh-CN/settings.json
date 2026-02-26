@@ -95,6 +95,10 @@
       "label": "深色模式",
       "description": "切换浅色和深色主题"
     },
+    "telemetry": {
+      "label": "数据传输",
+      "description": "启用后会将界面交互和对话遥测发送到配置的上报地址"
+    },
     "projectSorting": {
       "label": "项目排序",
       "description": "项目在侧边栏中的排列方式",

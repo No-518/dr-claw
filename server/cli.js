@@ -131,9 +131,9 @@ function showStatus() {
 
     console.log('\n' + c.dim('═'.repeat(60)));
     console.log(`\n${c.tip('[TIP]')} Hints:`);
-    console.log(`      ${c.dim('>')} Use ${c.bright('cloudcli --port 8080')} to run on a custom port`);
-    console.log(`      ${c.dim('>')} Use ${c.bright('cloudcli --database-path /path/to/db')} for custom database`);
-    console.log(`      ${c.dim('>')} Run ${c.bright('cloudcli help')} for all options`);
+    console.log(`      ${c.dim('>')} Use ${c.bright('vibelab --port 8080')} to run on a custom port`);
+    console.log(`      ${c.dim('>')} Use ${c.bright('vibelab --database-path /path/to/db')} for custom database`);
+    console.log(`      ${c.dim('>')} Run ${c.bright('vibelab help')} for all options`);
     console.log(`      ${c.dim('>')} Access the UI at http://localhost:${process.env.PORT || '3001'}\n`);
 }
 
@@ -145,8 +145,7 @@ function showHelp() {
 ╚═══════════════════════════════════════════════════════════════╝
 
 Usage:
-  claude-code-ui [command] [options]
-  cloudcli [command] [options]
+  vibelab [command] [options]
 
 Commands:
   start          Start the Vibe Lab server (default)
@@ -162,11 +161,11 @@ Options:
   -v, --version               Show version information
 
 Examples:
-  $ cloudcli                        # Start with defaults
-  $ cloudcli --port 8080            # Start on port 8080
-  $ cloudcli -p 3000                # Short form for port
-  $ cloudcli start --port 4000      # Explicit start command
-  $ cloudcli status                 # Show configuration
+  $ vibelab                        # Start with defaults
+  $ vibelab --port 8080            # Start on port 8080
+  $ vibelab -p 3000                # Short form for port
+  $ vibelab start --port 4000      # Explicit start command
+  $ vibelab status                 # Show configuration
 
 Environment Variables:
   PORT                Set server port (default: 3001)
@@ -175,10 +174,10 @@ Environment Variables:
   CONTEXT_WINDOW      Set context window size (default: 160000)
 
 Documentation:
-  ${packageJson.homepage || 'https://github.com/siteboon/claudecodeui'}
+  ${packageJson.homepage || 'https://github.com/OpenLAIR/VibeLab'}
 
 Report Issues:
-  ${packageJson.bugs?.url || 'https://github.com/siteboon/claudecodeui/issues'}
+  ${packageJson.bugs?.url || 'https://github.com/OpenLAIR/VibeLab/issues'}
 `);
 }
 
@@ -202,12 +201,12 @@ function isNewerVersion(v1, v2) {
 async function checkForUpdates(silent = false) {
     try {
         const { execSync } = await import('child_process');
-        const latestVersion = execSync('npm show @siteboon/claude-code-ui version', { encoding: 'utf8' }).trim();
+        const latestVersion = execSync('npm show vibelab version', { encoding: 'utf8' }).trim();
         const currentVersion = packageJson.version;
 
         if (isNewerVersion(latestVersion, currentVersion)) {
             console.log(`\n${c.warn('[UPDATE]')} New version available: ${c.bright(latestVersion)} (current: ${currentVersion})`);
-            console.log(`         Run ${c.bright('cloudcli update')} to update\n`);
+            console.log(`         Run ${c.bright('vibelab update')} to update\n`);
             return { hasUpdate: true, latestVersion, currentVersion };
         } else if (!silent) {
             console.log(`${c.ok('[OK]')} You are on the latest version (${currentVersion})`);
@@ -235,11 +234,11 @@ async function updatePackage() {
         }
 
         console.log(`${c.info('[INFO]')} Updating from ${currentVersion} to ${latestVersion}...`);
-        execSync('npm update -g @siteboon/claude-code-ui', { stdio: 'inherit' });
-        console.log(`${c.ok('[OK]')} Update complete! Restart cloudcli to use the new version.`);
+        execSync('npm update -g vibelab', { stdio: 'inherit' });
+        console.log(`${c.ok('[OK]')} Update complete! Restart vibelab to use the new version.`);
     } catch (e) {
         console.error(`${c.error('[ERROR]')} Update failed: ${e.message}`);
-        console.log(`${c.tip('[TIP]')} Try running manually: npm update -g @siteboon/claude-code-ui`);
+        console.log(`${c.tip('[TIP]')} Try running manually: npm update -g vibelab`);
     }
 }
 
@@ -315,7 +314,7 @@ async function main() {
             break;
         default:
             console.error(`\n❌ Unknown command: ${command}`);
-            console.log('   Run "cloudcli help" for usage information.\n');
+            console.log('   Run "vibelab help" for usage information.\n');
             process.exit(1);
     }
 }

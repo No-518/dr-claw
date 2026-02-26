@@ -1,0 +1,77 @@
+{
+  "ideation": {
+    "base": [
+      "inno-research-orchestrator",
+      "inno-prepare-resources",
+      "inno-deep-research",
+      "dataset-discovery",
+      "inno-idea-generation",
+      "inno-idea-eval"
+    ],
+    "byTaskType": {
+      "analysis": [
+        "inno-research-orchestrator",
+        "inno-idea-eval",
+        "inno-deep-research"
+      ],
+      "exploration": [
+        "inno-idea-generation",
+        "inno-code-survey",
+        "inno-deep-research",
+        "dataset-discovery"
+      ],
+      "implementation": [
+        "inno-prepare-resources"
+      ]
+    }
+  },
+  "experiment": {
+    "base": [
+      "inno-code-survey",
+      "dataset-discovery",
+      "inno-experiment-dev",
+      "inno-experiment-analysis",
+      "bioinformatics-init-analysis"
+    ],
+    "byTaskType": {
+      "implementation": [
+        "inno-experiment-dev",
+        "bioinformatics-init-analysis"
+      ],
+      "analysis": [
+        "inno-experiment-analysis",
+        "bioinformatics-init-analysis"
+      ],
+      "exploration": [
+        "inno-code-survey",
+        "dataset-discovery",
+        "inno-deep-research"
+      ]
+    }
+  },
+  "publication": {
+    "base": [
+      "inno-paper-writing",
+      "inno-figure-gen",
+      "inno-paper-reviewer",
+      "inno-humanizer",
+      "inno-reference-audit",
+      "inno-rclone-to-overleaf"
+    ],
+    "byTaskType": {
+      "writing": [
+        "inno-paper-writing",
+        "inno-figure-gen",
+        "inno-humanizer"
+      ],
+      "analysis": [
+        "inno-paper-reviewer",
+        "inno-reference-audit",
+        "inno-deep-research"
+      ],
+      "delivery": [
+        "inno-rclone-to-overleaf"
+      ]
+    }
+  }
+}

@@ -176,7 +176,11 @@
       "showingOf": "显示 {{shown}} / {{total}} 条消息",
       "scrollToLoad": "向上滚动以加载更多",
       "showingLast": "显示最近 {{count}} 条消息（共 {{total}} 条）",
-      "loadEarlier": "加载更早的消息"
+      "loadEarlier": "加载更早的消息",
+      "loadAll": "加载全部消息",
+      "loadingAll": "正在加载全部消息...",
+      "allLoaded": "全部消息已加载",
+      "perfWarning": "已加载全部消息 - 滚动可能变慢。点击「滚动到底部」恢复性能。"
     }
   },
   "shell": {
@@ -202,13 +206,41 @@
     "startSession": "启动新的 Claude 会话",
     "resumeSession": "恢复会话：{{displayName}}...",
     "runCommand": "在 {{projectName}} 中运行 {{command}}",
-    "startCli": "在 {{projectName}} 中启动 Claude CLI",
-    "defaultCommand": "命令"
+    "openTerminal": "在 {{projectName}} 中打开终端",
+    "startCli": "在 {{projectName}} 中启动 Claude CLI"
   },
   "projectSelection": {
     "startChatWithProvider": "选择一个项目以开始与 {{provider}} 聊天"
   },
   "tasks": {
-    "nextTaskPrompt": "开始下一个任务"
+    "nextTaskPrompt": "开始下一个任务",
+    "compact": {
+      "progress": "已完成 {{done}}/{{total}} · 待处理 {{pending}}",
+      "useInChat": "在聊天中使用",
+      "allTasks": "全部任务",
+      "allDone": "所有任务已完成",
+      "done": "已完成",
+      "inProgress": "进行中",
+      "pending": "待处理",
+      "expand": "展开任务进度",
+      "collapse": "收起任务进度"
+    }
+  },
+  "pipelineOnboarding": {
+    "noBrief": {
+      "title": "设置研究流水线",
+      "description": "在下方描述您的研究想法，Agent 将通过对话帮您构建流水线，生成研究简报和任务列表。",
+      "stepsLabel": "建议包含以下信息",
+      "step1": "您的研究主题和总体目标",
+      "step2": "范围、边界和目标会议/期刊（如有）",
+      "step3": "偏好的方法和评估方案",
+      "buttonLabel": "使用模板"
+    },
+    "noTasks": {
+      "title": "从研究简报生成任务",
+      "description": "检测到研究简报，但尚未生成任务。让 Agent 读取简报并创建任务列表。",
+      "briefExists": "已检测到 research_brief.json",
+      "buttonLabel": "使用模板"
+    }
   }
 }

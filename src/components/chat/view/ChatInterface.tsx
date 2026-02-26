@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import QuickSettingsPanel from '../../QuickSettingsPanel';
+import ChatTaskProgressPill from './subcomponents/ChatTaskProgressPill';
 import { useTasksSettings } from '../../../contexts/TasksSettingsContext';
+import { useTaskMaster } from '../../../contexts/TaskMasterContext';
 import { useTranslation } from 'react-i18next';
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
 import ChatComposer from './subcomponents/ChatComposer';
@@ -41,6 +43,7 @@ function ChatInterface({
   onShowAllTasks,
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
+  const { refreshTasks } = useTaskMaster();
   const { t } = useTranslation('chat');
 
   const streamBufferRef = useRef('');
@@ -96,11 +99,17 @@ function ChatInterface({
     visibleMessageCount,
     visibleMessages,
     loadEarlierMessages,
+    loadAllMessages,
+    allMessagesLoaded,
+    isLoadingAllMessages,
+    loadAllJustFinished,
+    showLoadAllOverlay,
     claudeStatus,
     setClaudeStatus,
     createDiff,
     scrollContainerRef,
     scrollToBottom,
+    scrollToBottomAndReset,
     handleScroll,
   } = useChatSessionState({
     selectedProject,
@@ -157,6 +166,7 @@ function ChatInterface({
     handlePermissionDecision,
     handleGrantToolPermission,
     handleInputFocusChange,
+    isInputFocused,
   } = useChatComposerState({
     selectedProject,
     selectedSession,
@@ -244,6 +254,20 @@ function ChatInterface({
     };
   }, [resetStreamingState]);
 
+  useEffect(() => {
+    if (!latestMessage?.type) {
+      return;
+    }
+
+    if (
+      latestMessage.type === 'claude-complete' ||
+      latestMessage.type === 'cursor-result' ||
+      latestMessage.type === 'codex-complete'
+    ) {
+      refreshTasks?.();
+    }
+  }, [latestMessage, refreshTasks]);
+
   if (!selectedProject) {
     const selectedProviderLabel =
       provider === 'cursor'
@@ -253,16 +277,27 @@ function ChatInterface({
           : t('messageTypes.claude');
 
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center text-muted-foreground">
-          <p className="text-sm">
-            {t('projectSelection.startChatWithProvider', {
-              provider: selectedProviderLabel,
-              defaultValue: 'Select a project to start chatting with {{provider}}',
-            })}
-          </p>
+      <>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center text-muted-foreground">
+            <p className="text-sm">
+              {t('projectSelection.startChatWithProvider', {
+                provider: selectedProviderLabel,
+                defaultValue: 'Select a project to start chatting with {{provider}}',
+              })}
+            </p>
+          </div>
         </div>
-      </div>
+        <div className="pointer-events-none fixed bottom-4 right-2 z-[120] w-[calc(100%-1rem)] max-w-[30rem] sm:right-4 sm:w-auto">
+          <ChatTaskProgressPill
+            className="pointer-events-auto"
+            onStartTask={(prompt?: string) =>
+              setInput(prompt && prompt.trim() ? prompt : t('tasks.nextTaskPrompt', { defaultValue: 'Start the next task' }))
+            }
+            onShowAllTasks={onShowAllTasks}
+          />
+        </div>
+      </>
     );
   }
 
@@ -297,6 +332,11 @@ function ChatInterface({
           visibleMessageCount={visibleMessageCount}
           visibleMessages={visibleMessages}
           loadEarlierMessages={loadEarlierMessages}
+          loadAllMessages={loadAllMessages}
+          allMessagesLoaded={allMessagesLoaded}
+          isLoadingAllMessages={isLoadingAllMessages}
+          loadAllJustFinished={loadAllJustFinished}
+          showLoadAllOverlay={showLoadAllOverlay}
           createDiff={createDiff}
           onFileOpen={onFileOpen}
           onShowSettings={onShowSettings}
@@ -307,6 +347,16 @@ function ChatInterface({
           selectedProject={selectedProject}
           isLoading={isLoading}
         />
+
+        <div className="pointer-events-none fixed bottom-4 right-2 z-[120] w-[calc(100%-1rem)] max-w-[30rem] sm:right-4 sm:w-auto">
+          <ChatTaskProgressPill
+            className="pointer-events-auto"
+            onStartTask={(prompt?: string) =>
+              setInput(prompt && prompt.trim() ? prompt : t('tasks.nextTaskPrompt', { defaultValue: 'Start the next task' }))
+            }
+            onShowAllTasks={onShowAllTasks}
+          />
+        </div>
 
         <ChatComposer
           pendingPermissionRequests={pendingPermissionRequests}
@@ -327,7 +377,7 @@ function ChatInterface({
           onClearInput={handleClearInput}
           isUserScrolledUp={isUserScrolledUp}
           hasMessages={chatMessages.length > 0}
-          onScrollToBottom={scrollToBottom}
+          onScrollToBottom={scrollToBottomAndReset}
           onSubmit={handleSubmit}
           isDragActive={isDragActive}
           attachedImages={attachedImages}
@@ -362,6 +412,7 @@ function ChatInterface({
           onTextareaScrollSync={syncInputOverlayScroll}
           onTextareaInput={handleTextareaInput}
           onInputFocusChange={handleInputFocusChange}
+          isInputFocused={isInputFocused}
           placeholder={t('input.placeholder', {
             provider:
               provider === 'cursor'

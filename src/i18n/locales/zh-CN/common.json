@@ -24,16 +24,22 @@
     "git": "源代码管理",
     "tasks": "任务",
     "researchLab": "研究实验室",
+    "skills": "技能",
     "latexEditing": "LaTeX 编辑"
   },
   "researchLabGuide": {
-    "title": "如何正确使用 VibeLab",
-    "description": "在本项目中运行研究任务前，请先按 Usage Guide 的流程操作。",
-    "step1": "创建或打开一个项目",
-    "step2": "在 Chat 页面选择 CLI 后端（Claude Code / Cursor / Codex）并开始对话",
-    "step3": "描述你的研究目标，让 orchestrator 启动完整流程",
-    "step4": "在 Research Lab 中查看 idea、产物与论文输出",
-    "readmeHint": "请参考 README.md -> Usage Guide（使用指南）中的完整流程。"
+    "title": "如何使用 VibeLab",
+    "description": "在聊天中描述你的研究想法，Agent 会通过对话生成你的研究流水线和任务。然后在此页面查看和执行任务。",
+    "step1": "前往聊天页面，描述你的研究主题、目标或论文构想。Agent 会提出澄清性问题。",
+    "step2": "Agent 根据对话内容生成 .pipeline/docs/research_brief.json 和 .pipeline/tasks/tasks.json。",
+    "step3": "在研究实验室中查看任务列表。点击任务上的 Go to Chat 按钮，由 Agent 执行该任务。",
+    "step4": "在 Ideation、Experiment、Publication 三个阶段间跟踪进度，随时完善 Brief 和任务。",
+    "interfaceMap": "界面布局：左侧为任务列表和进度，右侧为文件预览。点击任务上的 Go to Chat 按钮执行任务。",
+    "readmeHint": "完整流程请参考 README.md -> Usage Guide（使用指南）。",
+    "briefEditingTitle": "Research Brief 编辑指引",
+    "briefEditingStep1": "先填写核心约束（目标、边界、评估指标）；信息不完整也可以先生成任务。",
+    "briefEditingStep2": "点击 Apply Template + Generate Tasks，会更新 .pipeline/docs/research_brief.json，并据此生成/刷新 .pipeline/tasks/tasks.json。",
+    "briefEditingStep3": "在下方 Pipeline Task List 中使用 Use in Chat 按顺序执行任务，并把澄清后的结论持续回写到 research_brief。"
   },
   "status": {
     "loading": "加载中...",
@@ -195,6 +201,9 @@
       "creating": "创建中...",
       "cloning": "正在克隆..."
     },
+    "folderBrowser": {
+      "regenerateName": "生成新名称"
+    },
     "errors": {
       "selectType": "请选择您已有现有工作区还是想创建新工作区",
       "providePath": "请提供工作区路径",
@@ -211,6 +220,7 @@
     "viewFullRelease": "查看完整发布",
     "updateProgress": "更新进度：",
     "manualUpgrade": "手动升级：",
+    "npmUpgradeCommand": "npm install -g vibelab@latest",
     "manualUpgradeHint": "或点击'立即更新'以自动运行更新。",
     "updateCompleted": "更新成功完成！",
     "restartServer": "请重启服务器以应用更改。",

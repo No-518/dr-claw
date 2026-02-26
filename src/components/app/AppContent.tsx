@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import Sidebar from '../sidebar/view/Sidebar';
@@ -10,13 +10,20 @@ import { useWebSocket } from '../../contexts/WebSocketContext';
 import { useDeviceSettings } from '../../hooks/useDeviceSettings';
 import { useSessionProtection } from '../../hooks/useSessionProtection';
 import { useProjectsState } from '../../hooks/useProjectsState';
+import { useInteractionTelemetry } from '../../hooks/useInteractionTelemetry';
+import {
+  ensureTelemetryDefaultEnabled,
+  isTelemetryEnabled,
+  TELEMETRY_SETTINGS_EVENT,
+} from '../../utils/telemetry';
 
 export default function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { sessionId } = useParams<{ sessionId?: string }>();
   const { t } = useTranslation('common');
   const { isMobile } = useDeviceSettings({ trackPWA: false });
-  const { ws, sendMessage, latestMessage } = useWebSocket();
+  const { ws, sendMessage, latestMessage, isConnected } = useWebSocket();
 
   const {
     activeSessions,
@@ -51,6 +58,17 @@ export default function AppContent() {
     activeSessions,
   });
 
+  useInteractionTelemetry({
+    selectedProjectName: selectedProject?.name || null,
+    selectedSessionId: selectedSession?.id || sessionId || null,
+    activeTab: activeTab || null,
+    routePath: location.pathname || null,
+  });
+
+  useEffect(() => {
+    ensureTelemetryDefaultEnabled();
+  }, []);
+
   useEffect(() => {
     window.refreshProjects = fetchProjects;
 
@@ -70,6 +88,25 @@ export default function AppContent() {
       }
     };
   }, [openSettings]);
+
+  useEffect(() => {
+    if (!isConnected) {
+      return;
+    }
+
+    const syncTelemetrySetting = () => {
+      sendMessage({
+        type: 'telemetry-settings',
+        enabled: isTelemetryEnabled(),
+      });
+    };
+
+    syncTelemetrySetting();
+    window.addEventListener(TELEMETRY_SETTINGS_EVENT, syncTelemetrySetting);
+    return () => {
+      window.removeEventListener(TELEMETRY_SETTINGS_EVENT, syncTelemetrySetting);
+    };
+  }, [isConnected, sendMessage]);
 
   return (
     <div className="fixed inset-0 flex bg-background">
@@ -106,7 +143,7 @@ export default function AppContent() {
         </div>
       )}
 
-      <div className={`flex-1 flex flex-col min-w-0 ${isMobile && !isInputFocused ? 'pb-mobile-nav' : ''}`}>
+      <div className={`flex-1 flex flex-col min-w-0 ${isMobile ? 'pb-mobile-nav' : ''}`}>
         <MainContent
           selectedProject={selectedProject}
           selectedSession={selectedSession}

@@ -3,11 +3,11 @@ import ReactDOM from 'react-dom';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { Button } from '../../../ui/button';
-import ProjectCreationWizard from '../../../ProjectCreationWizard';
 import Settings from '../../../Settings';
 import VersionUpgradeModal from '../../../modals/VersionUpgradeModal';
 import type { Project } from '../../../../types/app';
 import type { ReleaseInfo } from '../../../../types/sharedTypes';
+import type { InstallMode } from '../../../../hooks/useVersionCheck';
 import { normalizeProjectForSettings } from '../../utils/utils';
 import type { DeleteProjectConfirmation, SessionDeleteConfirmation, SettingsProject } from '../../types/types';
 
@@ -16,9 +16,6 @@ type SidebarModalsProps = {
   showSettings: boolean;
   settingsInitialTab: string;
   onCloseSettings: () => void;
-  showNewProject: boolean;
-  onCloseNewProject: () => void;
-  onProjectCreated: () => void;
   deleteConfirmation: DeleteProjectConfirmation | null;
   onCancelDeleteProject: () => void;
   onConfirmDeleteProject: () => void;
@@ -30,6 +27,7 @@ type SidebarModalsProps = {
   releaseInfo: ReleaseInfo | null;
   currentVersion: string;
   latestVersion: string | null;
+  installMode: InstallMode;
   t: TFunction;
 };
 
@@ -51,9 +49,6 @@ export default function SidebarModals({
   showSettings,
   settingsInitialTab,
   onCloseSettings,
-  showNewProject,
-  onCloseNewProject,
-  onProjectCreated,
   deleteConfirmation,
   onCancelDeleteProject,
   onConfirmDeleteProject,
@@ -65,6 +60,7 @@ export default function SidebarModals({
   releaseInfo,
   currentVersion,
   latestVersion,
+  installMode,
   t,
 }: SidebarModalsProps) {
   // Settings expects project identity/path fields to be present for dropdown labels and local-scope MCP config.
@@ -75,15 +71,6 @@ export default function SidebarModals({
 
   return (
     <>
-      {showNewProject &&
-        ReactDOM.createPortal(
-          <ProjectCreationWizard
-            onClose={onCloseNewProject}
-            onProjectCreated={onProjectCreated}
-          />,
-          document.body,
-        )}
-
       {showSettings &&
         ReactDOM.createPortal(
           <TypedSettings
@@ -199,6 +186,7 @@ export default function SidebarModals({
         releaseInfo={releaseInfo}
         currentVersion={currentVersion}
         latestVersion={latestVersion}
+        installMode={installMode}
       />
     </>
   );

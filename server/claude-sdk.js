@@ -250,7 +250,13 @@ function getAllSessions() {
  * @returns {Object} Transformed message ready for WebSocket
  */
 function transformMessage(sdkMessage) {
-  // Pass-through; SDK messages match frontend format.
+  // Extract parent_tool_use_id for subagent tool grouping
+  if (sdkMessage.parent_tool_use_id) {
+    return {
+      ...sdkMessage,
+      parentToolUseId: sdkMessage.parent_tool_use_id
+    };
+  }
   return sdkMessage;
 }
 
@@ -427,14 +433,42 @@ async function loadMcpConfig(cwd) {
       }
     }
 
+    // VibeLab no longer relies on TaskMaster MCP tooling in chat sessions.
+    // Filter out any TaskMaster-related MCP entries to prevent legacy "not installed" errors.
+    const filteredMcpServers = Object.fromEntries(
+      Object.entries(mcpServers).filter(([name, config]) => {
+        const normalizedName = String(name || '').toLowerCase();
+        const command = String(config?.command || '').toLowerCase();
+        const argsJoined = Array.isArray(config?.args)
+          ? config.args.map((arg) => String(arg || '').toLowerCase()).join(' ')
+          : '';
+
+        const isTaskMasterServer =
+          normalizedName.includes('task-master') ||
+          normalizedName.includes('taskmaster') ||
+          command.includes('task-master') ||
+          command.includes('taskmaster') ||
+          argsJoined.includes('task-master') ||
+          argsJoined.includes('taskmaster');
+
+        return !isTaskMasterServer;
+      })
+    );
+
     // Return null if no servers found
-    if (Object.keys(mcpServers).length === 0) {
+    if (Object.keys(filteredMcpServers).length === 0) {
       console.log('No MCP servers configured');
       return null;
     }
 
-    console.log(`Total MCP servers loaded: ${Object.keys(mcpServers).length}`);
-    return mcpServers;
+    if (Object.keys(filteredMcpServers).length !== Object.keys(mcpServers).length) {
+      console.log(
+        `Filtered legacy TaskMaster MCP servers: ${Object.keys(mcpServers).length - Object.keys(filteredMcpServers).length}`
+      );
+    }
+
+    console.log(`Total MCP servers loaded: ${Object.keys(filteredMcpServers).length}`);
+    return filteredMcpServers;
   } catch (error) {
     console.error('Error loading MCP config:', error.message);
     return null;

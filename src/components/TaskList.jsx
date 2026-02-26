@@ -222,7 +222,7 @@ const TaskList = ({
   };
 
   if (tasks.length === 0) {
-    // Check if TaskMaster is configured by looking for .taskmaster directory
+    // Check if TaskMaster is configured by looking for .pipeline directory
     const hasTaskMasterDirectory = currentProject?.taskMasterConfigured || 
                                    currentProject?.taskmaster?.hasTaskmaster ||
                                    projectTaskMaster?.hasTaskmaster;
@@ -954,7 +954,7 @@ const TaskList = ({
                     <div className="bg-white dark:bg-gray-800/50 rounded border border-green-200 dark:border-green-700/50 p-3 mb-2">
                       <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">💬 Example:</p>
                       <p className="text-xs text-gray-900 dark:text-white font-mono">
-                        "I've just initialized a new project with Claude Task Master. I have a PRD at .taskmaster/docs/prd.txt. Can you help me parse it and set up the initial tasks?"
+                        "I've just initialized a new project with Claude Task Master. I have a Research Brief JSON at .pipeline/docs/research_brief.json. Can you help me parse it and set up the initial tasks?"
                       </p>
                     </div>
                   </div>

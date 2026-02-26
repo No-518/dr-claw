@@ -3,6 +3,7 @@ import { Check, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import SessionProviderLogo from '../../../SessionProviderLogo';
 import NextTaskBanner from '../../../NextTaskBanner.jsx';
+import PipelineOnboardingBanner from './PipelineOnboardingBanner';
 import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../../../../shared/modelConstants';
 import type { ProjectSession, SessionProvider } from '../../../../types/app';
 
@@ -194,10 +195,16 @@ export default function ProviderSelectionEmptyState({
             </p>
           </div>
 
-          {/* Task banner */}
-          {provider && tasksEnabled && isTaskMasterInstalled && (
+          {/* Pipeline onboarding or task banner */}
+          {provider && (
             <div className="mt-5">
-              <NextTaskBanner onStartTask={() => setInput(nextTaskPrompt)} onShowAllTasks={onShowAllTasks} />
+              <PipelineOnboardingBanner setInput={setInput} textareaRef={textareaRef} />
+              {tasksEnabled && isTaskMasterInstalled && (
+                <NextTaskBanner
+                  onStartTask={(prompt?: string) => setInput(prompt && prompt.trim() ? prompt : nextTaskPrompt)}
+                  onShowAllTasks={onShowAllTasks}
+                />
+              )}
             </div>
           )}
         </div>
@@ -213,11 +220,15 @@ export default function ProviderSelectionEmptyState({
           <p className="text-lg font-semibold text-foreground mb-1.5">{t('session.continue.title')}</p>
           <p className="text-sm text-muted-foreground leading-relaxed">{t('session.continue.description')}</p>
 
-          {tasksEnabled && isTaskMasterInstalled && (
-            <div className="mt-5">
-              <NextTaskBanner onStartTask={() => setInput(nextTaskPrompt)} onShowAllTasks={onShowAllTasks} />
-            </div>
-          )}
+          <div className="mt-5">
+            <PipelineOnboardingBanner setInput={setInput} textareaRef={textareaRef} />
+            {tasksEnabled && isTaskMasterInstalled && (
+              <NextTaskBanner
+                onStartTask={(prompt?: string) => setInput(prompt && prompt.trim() ? prompt : nextTaskPrompt)}
+                onShowAllTasks={onShowAllTasks}
+              />
+            )}
+          </div>
         </div>
       </div>
     );

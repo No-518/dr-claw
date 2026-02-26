@@ -56,89 +56,22 @@ const NextTaskBanner = ({ onShowAllTasks, onStartTask, className = '' }) => {
 
   let bannerContent;
 
-  // Show setup message only if no tasks exist AND TaskMaster is not configured
+  // Chat should stay free from legacy TaskMaster setup prompts.
+  // When no tasks/pipeline exist, let PipelineOnboardingBanner handle guidance.
   if ((!tasks || tasks.length === 0) && !projectTaskMaster?.hasTaskmaster) {
-    bannerContent = (
-      <div className={cn(
-        'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4',
-        className
-      )}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <List className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <div>
-              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                TaskMaster AI is not configured
-              </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowTaskOptions(!showTaskOptions)}
-              className="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors flex items-center gap-1"
-            >
-              <Settings className="w-3 h-3" />
-              Initialize TaskMaster AI
-            </button>
-          </div>
-        </div>
-        
-        {showTaskOptions && (
-          <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
-            {!projectTaskMaster?.hasTaskmaster && (
-              <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/50 rounded-lg">
-                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-                  🎯 What is TaskMaster?
-                </h4>
-                <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                  <p>• <strong>AI-Powered Task Management:</strong> Break complex projects into manageable subtasks</p>
-                  <p>• <strong>PRD Templates:</strong> Generate tasks from Product Requirements Documents</p>
-                  <p>• <strong>Dependency Tracking:</strong> Understand task relationships and execution order</p>
-                  <p>• <strong>Progress Visualization:</strong> Kanban boards and detailed task analytics</p>
-                  <p>• <strong>CLI Integration:</strong> Use taskmaster commands for advanced workflows</p>
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              {!projectTaskMaster?.hasTaskmaster ? (
-                <button
-                  className="text-xs px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded transition-colors text-left flex items-center gap-2"
-                  onClick={() => setShowCLI(true)}
-                >
-                  <Terminal className="w-3 h-3" />
-                  Initialize TaskMaster
-                </button>
-              ) : (
-                <>
-                  <div className="mb-2 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs text-green-800 dark:text-green-200">
-                    <strong>Add more tasks:</strong> Create additional tasks manually or generate them from a PRD template
-                  </div>
-                  <button
-                    className="text-xs px-3 py-2 bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-800 text-green-800 dark:text-green-200 rounded transition-colors text-left flex items-center gap-2 disabled:opacity-50"
-                    onClick={handleCreateManualTask}
-                    disabled={isLoading}
-                  >
-                    <Plus className="w-3 h-3" />
-                    Create a new task manually
-                  </button>
-                  <button
-                    className="text-xs px-3 py-2 bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 text-purple-800 dark:text-purple-200 rounded transition-colors text-left flex items-center gap-2 disabled:opacity-50"
-                    onClick={handleParsePRD}
-                    disabled={isLoading}
-                  >
-                    <FileText className="w-3 h-3" />
-                    {isLoading ? 'Parsing...' : 'Generate tasks from PRD template'}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    );
+    bannerContent = null;
   } else if (nextTask) {
+    const stage = String(nextTask.stage || '').trim();
+    const guidance = nextTask.guidance || {};
+    const requiredInputs = Array.isArray(nextTask.inputsNeeded) && nextTask.inputsNeeded.length > 0
+      ? nextTask.inputsNeeded
+      : (Array.isArray(guidance.requiredInputs) ? guidance.requiredInputs : []);
+    const suggestedSkills = Array.isArray(nextTask.suggestedSkills) && nextTask.suggestedSkills.length > 0
+      ? nextTask.suggestedSkills
+      : (Array.isArray(guidance.suggestedSkills) ? guidance.suggestedSkills : []);
+    const whyNext = nextTask.whyNext || guidance.whyNext || '';
+    const nextActionPrompt = nextTask.nextActionPrompt || guidance.nextActionPrompt || '';
+
     // Show next task if available
     bannerContent = (
       <div className={cn(
@@ -152,6 +85,11 @@ const NextTaskBanner = ({ onShowAllTasks, onStartTask, className = '' }) => {
                 <Target className="w-3 h-3 text-blue-600 dark:text-blue-400" />
               </div>
               <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Task {nextTask.id}</span>
+              {stage && (
+                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                  {stage}
+                </span>
+              )}
               {nextTask.priority === 'high' && (
                 <div className="w-4 h-4 rounded bg-red-100 dark:bg-red-900/50 flex items-center justify-center" title="High Priority">
                   <Zap className="w-2.5 h-2.5 text-red-600 dark:text-red-400" />
@@ -175,11 +113,11 @@ const NextTaskBanner = ({ onShowAllTasks, onStartTask, className = '' }) => {
           
           <div className="flex items-center gap-1 flex-shrink-0">
             <button
-              onClick={() => onStartTask?.()}
+              onClick={() => onStartTask?.(nextActionPrompt)}
               className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors shadow-sm flex items-center gap-1"
             >
               <Play className="w-3 h-3" />
-              Start Task
+              Use in Chat
             </button>
             <button
               onClick={() => setShowTaskDetail(true)}
@@ -199,7 +137,34 @@ const NextTaskBanner = ({ onShowAllTasks, onStartTask, className = '' }) => {
             )}
           </div>
         </div>
-        
+
+        {(whyNext || requiredInputs.length > 0 || suggestedSkills.length > 0) && (
+          <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 space-y-1.5">
+            {whyNext && (
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                <span className="font-medium">Why next:</span> {whyNext}
+              </p>
+            )}
+            {requiredInputs.length > 0 && (
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                <span className="font-medium">Missing inputs:</span> {requiredInputs.join(', ')}
+              </p>
+            )}
+            {suggestedSkills.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-xs text-slate-600 dark:text-slate-300 font-medium mr-1">Suggested skills:</span>
+                {suggestedSkills.map((skill) => (
+                  <span
+                    key={skill}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   } else if (tasks && tasks.length > 0) {
@@ -486,7 +451,7 @@ const TemplateSelector = ({ currentProject, onClose, onTemplateApplied }) => {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [customizations, setCustomizations] = useState({});
-  const [fileName, setFileName] = useState('prd.txt');
+  const [fileName, setFileName] = useState('research_brief.json');
   const [isLoading, setIsLoading] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
   const [step, setStep] = useState('select'); // 'select', 'customize', 'generate'
@@ -511,13 +476,14 @@ const TemplateSelector = ({ currentProject, onClose, onTemplateApplied }) => {
 
   const handleSelectTemplate = (template) => {
     setSelectedTemplate(template);
-    // Find placeholders in template content
-    const placeholders = template.content.match(/\[([^\]]+)\]/g) || [];
-    const uniquePlaceholders = [...new Set(placeholders.map(p => p.slice(1, -1)))];
+    const fields = [
+      ...(Array.isArray(template.metaFields) ? template.metaFields : []),
+      ...Object.values(template.sectionFields || {}).flat(),
+    ];
     
     const initialCustomizations = {};
-    uniquePlaceholders.forEach(placeholder => {
-      initialCustomizations[placeholder] = '';
+    fields.forEach((field) => {
+      if (field?.path) initialCustomizations[field.path] = '';
     });
     
     setCustomizations(initialCustomizations);
@@ -544,7 +510,7 @@ const TemplateSelector = ({ currentProject, onClose, onTemplateApplied }) => {
       // Parse PRD to generate tasks
       const parseResponse = await api.taskmaster.parsePRD(currentProject.name, {
         fileName,
-        numTasks: 10
+        append: true
       });
 
       if (!parseResponse.ok) {
@@ -628,7 +594,7 @@ const TemplateSelector = ({ currentProject, onClose, onTemplateApplied }) => {
                 value={fileName}
                 onChange={(e) => setFileName(e.target.value)}
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="prd.txt"
+                placeholder="research_brief.json"
               />
             </div>
 

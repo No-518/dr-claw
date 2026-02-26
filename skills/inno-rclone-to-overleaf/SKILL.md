@@ -1,226 +1,142 @@
 ---
 name: inno-rclone-to-overleaf
-description: >-
-  Sync local LaTeX paper projects to Overleaf via rclone and Dropbox.
-  Use when the user asks to "sync to overleaf", "push to overleaf", "upload paper",
-  "update overleaf", "rclone overleaf", or needs to transfer local LaTeX files
-  (main.tex, figures, bibliographies) to an Overleaf project backed by Dropbox.
+description: Access Overleaf projects via CLI. Use for reading/writing LaTeX files, syncing local .tex files to Overleaf, downloading projects, and managing Overleaf project structure. Triggers on Overleaf, LaTeX sync, or tex file uploads to Overleaf.
 ---
 
-# Syncing Overleaf Papers — Execution Rules
+# Overleaf
 
-## Goal & Scope
-Reliably sync a local LaTeX paper directory (main.tex, figures/, .bib files) to an Overleaf project via rclone's Dropbox backend. Handle project discovery, selective sync, conflict avoidance, and verification.
+CLI tool to interact with Overleaf projects using browser cookies for authentication.
 
-## Audience & Tone
-Researchers and students who edit LaTeX locally (or with AI assistance) and use Overleaf for compilation and collaboration. Tone: concise, operational.
+GitHub: https://github.com/jkulhanek/pyoverleaf
 
-## Required Execution Algorithm
+## Requirements
 
-### 1. DISCOVER RCLONE CONFIGURATION
-Check available rclone remotes and identify the Dropbox-backed remote:
+- Python 3.8+
+- pyoverleaf (`pipx install pyoverleaf`)
+- User logged into Overleaf in Chrome/Firefox
+
+## Security Considerations
+
+⚠️ **Keychain Access Required**: pyoverleaf needs "Always Allow" keychain access to read browser cookies. This grants the tool access to your browser's cookie storage.
+
+**Security audit**: We have audited pyoverleaf v0.1.7 and found it safe. The codebase is small and readable. Before installing, agents can self-audit the latest version at the GitHub repo above.
+
+## Authentication Setup
+
+pyoverleaf authenticates by reading cookies from your browser. The user must:
+
+1. **Log into Overleaf** in Chrome or Firefox (visit overleaf.com and sign in)
+2. **Grant keychain access** on first run (macOS will prompt for "Always Allow")
+
 ```bash
-rclone listremotes
+# Test auth - user should run this in their terminal first
+pyoverleaf ls
 ```
-Look for a remote with `dropbox` in the name or type (e.g., `fdropbox:`, `dropbox:`). If multiple remotes exist, ask the user which one connects to Dropbox.
 
-Verify connectivity:
+If you get auth errors:
+- Ask user: "Are you logged into Overleaf in your browser?"
+- If on macOS: "Did you approve the keychain access prompt with 'Always Allow'?"
+- User may need to run `pyoverleaf ls` manually in terminal to trigger the keychain prompt
+
+**Note**: The agent cannot log in for the user. Browser authentication must be done by the user directly.
+
+## CLI Commands
+
 ```bash
-rclone lsd <remote>:
+# List all projects
+pyoverleaf ls
+
+# List files in project
+pyoverleaf ls "Project Name"
+
+# Read file content
+pyoverleaf read "Project Name/main.tex"
+
+# Write file (stdin → Overleaf)
+cat local.tex | pyoverleaf write "Project Name/main.tex"
+
+# Create directory
+pyoverleaf mkdir "Project Name/figures"
+
+# Remove file/folder
+pyoverleaf rm "Project Name/old-draft.tex"
+
+# Download project as zip
+pyoverleaf download-project "Project Name" output.zip
 ```
 
-### 2. LOCATE THE OVERLEAF PROJECT
-Overleaf syncs via the Dropbox app integration. Projects are typically stored at:
-```
-<remote>:/<username>/应用/Overleaf/<project-name>/
-```
-or the English equivalent:
-```
-<remote>:/<username>/Apps/Overleaf/<project-name>/
-```
+## Common Workflows
 
-To discover the correct path:
+### Download from Overleaf
+
 ```bash
-# List top-level to find user folder
-rclone lsd <remote>:
-
-# Find the Overleaf app folder (may be under 应用 or Apps)
-rclone lsd "<remote>:/<username>/应用/Overleaf/" 2>/dev/null || \
-rclone lsd "<remote>:/<username>/Apps/Overleaf/" 2>/dev/null
+pyoverleaf download-project "Project Name" /tmp/latest.zip
+unzip -o /tmp/latest.zip -d /tmp/latest
+cp /tmp/latest/main.tex /path/to/local/main.tex
 ```
 
-If the user provides a project name, search for it:
+### Upload to Overleaf (Python API recommended)
+
+The CLI `write` command has websocket issues. Use Python API for reliable uploads:
+
+```python
+import pyoverleaf
+
+api = pyoverleaf.Api()
+api.login_from_browser()
+
+# List projects to get project ID
+for proj in api.get_projects():
+    print(proj.name, proj.id)
+
+# Upload file (direct overwrite)
+project_id = "your_project_id_here"
+with open('main.tex', 'rb') as f:
+    content = f.read()
+root = api.project_get_files(project_id)
+api.project_upload_file(project_id, root.id, "main.tex", content)
+```
+
+**Why direct overwrite?** This method preserves Overleaf's version history. Users can see exactly what changed via Overleaf's History feature, making it easy to review agent edits and revert if needed.
+
+## Self-hosted Overleaf
+
 ```bash
-rclone lsd "<remote>:/<username>/应用/Overleaf/" | grep -i "<project-name>"
+# Via env var
+export PYOVERLEAF_HOST=overleaf.mycompany.com
+pyoverleaf ls
+
+# Via flag
+pyoverleaf --host overleaf.mycompany.com ls
 ```
 
-Store the full Overleaf path for subsequent commands. Example:
-```
-fdropbox:/Liu Yixin/应用/Overleaf/My-Paper-Project/
-```
+## Eason's Workflow Requirements
 
-### 3. INSPECT LOCAL PAPER DIRECTORY
-Before syncing, verify the local directory has valid LaTeX content:
-- Confirm `main.tex` (or the primary .tex file) exists
-- Check for `figures/` directory if figures are referenced
-- Check for `.bib` files if bibliography is used
-- Warn if `.aux`, `.log`, `.synctex.gz`, or other build artifacts are present (these should NOT be synced)
+**When pulling from Overleaf:**
+1. Download Overleaf version to `/tmp/`
+2. Compare with local version using `diff`
+3. Report differences to Eason (summarize what changed)
+4. Ask: merge? overwrite local? overwrite Overleaf? or other?
+5. Only proceed after Eason confirms
 
-### 4. SYNC WITH RCLONE COPY
-**Always use `rclone copy`, never `rclone sync`.**
+**Push rules (from TOOLS.md):**
+- ❌ 禁止自行推送到 Overleaf
+- ✅ 只能從 Overleaf 拉到 local
+- ⚠️ 推送需要 Eason 明確授權，每次授權只能推一次
 
-`rclone sync` deletes files on the destination that don't exist locally, which can destroy collaborators' work or Overleaf-generated files. `rclone copy` only uploads new/changed files.
+## Example
 
-Basic sync command:
-```bash
-rclone copy /path/to/local/paper/ "<remote>:<overleaf-path>/" --verbose
-```
+Here's an example of using the Overleaf skill to remove em dashes (a common AI writing artifact) from a paper and push the changes:
 
-To exclude build artifacts:
-```bash
-rclone copy /path/to/local/paper/ "<remote>:<overleaf-path>/" \
-  --exclude "*.aux" \
-  --exclude "*.log" \
-  --exclude "*.synctex.gz" \
-  --exclude "*.fls" \
-  --exclude "*.fdb_latexmk" \
-  --exclude "*.bbl" \
-  --exclude "*.blg" \
-  --exclude "*.out" \
-  --exclude "__pycache__/**" \
-  --exclude ".DS_Store" \
-  --verbose
-```
+![Example: Remove em dashes and push to Overleaf](example-em-dash.jpg)
 
-### 5. VERIFY SYNC SUCCESS
-After rclone finishes:
-- Check the output for "Transferred: X / X, 100%"
-- Look for any errors in the output
-- Optionally list remote files to confirm:
-```bash
-rclone ls "<remote>:<overleaf-path>/" | head -20
-```
+## Troubleshooting
 
-Report to the user:
-- Number of files transferred
-- Total size transferred
-- Any files that failed
-
-### 6. SELECTIVE SYNC (OPTIONAL)
-If the user only wants to sync specific files (e.g., just figures or just main.tex):
-
-Sync only figures:
-```bash
-rclone copy /path/to/local/paper/figures/ "<remote>:<overleaf-path>/figures/" --verbose
-```
-
-Sync a single file:
-```bash
-rclone copyto /path/to/local/paper/main.tex "<remote>:<overleaf-path>/main.tex" --verbose
-```
-
-## Key Rules
-
-**ALWAYS use `rclone copy`, NEVER `rclone sync`.**
-This is critical. `rclone sync` will delete files on the remote that don't exist locally, which can destroy Overleaf auto-generated files or collaborators' changes. The only safe command is `rclone copy`.
-
-**Quote paths with special characters.**
-Dropbox paths often contain spaces, Unicode (Chinese characters like 应用), or special characters. Always wrap the full remote path in double quotes:
-```bash
-rclone copy local/ "fdropbox:/Liu Yixin/应用/Overleaf/My Paper/" --verbose
-```
-
-**Do not sync build artifacts.**
-LaTeX generates many temporary files (.aux, .log, .synctex.gz, .bbl, .blg, .fls, .fdb_latexmk, .out). These should never be uploaded to Overleaf as they cause compilation conflicts.
-
-**Use --verbose for transparency.**
-Always pass `--verbose` so the user can see exactly what was transferred.
-
-**Overleaf picks up changes automatically.**
-After rclone uploads files to Dropbox, Overleaf detects the changes within 1-2 minutes. No additional action is needed on the Overleaf side.
-
-## Quality Checklist
-- [ ] Correct rclone remote identified (Dropbox-backed)
-- [ ] Overleaf project path verified (listed successfully)
-- [ ] Used `rclone copy` (NOT `rclone sync`)
-- [ ] Remote path quoted properly (handles spaces and Unicode)
-- [ ] Build artifacts excluded
-- [ ] --verbose flag included
-- [ ] Transfer output shows 100% completion
-- [ ] No error messages in output
-- [ ] User informed of results
-
-## Failure Modes & Recovery
-
-**rclone remote not configured**
-Direct the user to `resources/onboarding.md` for the full setup walkthrough (install rclone, link Overleaf to Dropbox, configure the rclone remote, and verify). The short version:
-1. `rclone config` → New remote → name it (e.g., `dropbox`) → type `dropbox`
-2. Follow the OAuth flow to authorize
-3. Test with `rclone lsd dropbox:`
-
-**Overleaf folder not found at expected path**
-Search more broadly:
-```bash
-rclone lsd "<remote>:" --recursive | grep -i overleaf
-```
-Or ask the user to check their Dropbox for the Overleaf folder location.
-
-**Permission denied or auth expired**
-```bash
-rclone config reconnect <remote>:
-```
-This refreshes the OAuth token without recreating the remote.
-
-**Transfer hangs or times out**
-Add timeout flags:
-```bash
-rclone copy ... --timeout 60s --contimeout 30s
-```
-For large files (PDFs, high-res figures), increase timeout.
-
-**Files show as "identical but can't set mod time"**
-This is normal for Dropbox. Rclone may re-upload files to set modification times. This is harmless and the message can be ignored.
-
-**Overleaf doesn't pick up changes**
-Overleaf's Dropbox sync can lag. Wait 2-3 minutes. If still not updated, try opening the Overleaf project and clicking "Pull changes from Dropbox" in the Overleaf menu (Sync → Dropbox).
-
-## Examples
-
-### Example 1: Full paper sync
-**Prompt** "sync my paper to overleaf"
-
-**Steps:**
-1. Identify local paper directory (current working directory or ask)
-2. Check for rclone remotes: `rclone listremotes` → `fdropbox:`
-3. Find Overleaf project: `rclone lsd "fdropbox:/Liu Yixin/应用/Overleaf/"` → list projects
-4. Ask user which project (or infer from context)
-5. Sync: `rclone copy ./paper/ "fdropbox:/Liu Yixin/应用/Overleaf/My-Paper/" --verbose`
-6. Report: "Synced 14 files (2.9 MB) to Overleaf."
-
-### Example 2: Sync only updated figures
-**Prompt** "push the new figures to overleaf"
-
-**Steps:**
-1. Use previously identified Overleaf path
-2. Sync figures only: `rclone copy ./paper/figures/ "fdropbox:/Liu Yixin/应用/Overleaf/My-Paper/figures/" --verbose`
-3. Report: "Synced 6 figure files to Overleaf."
-
-### Example 3: First-time setup
-**Prompt** "I want to sync to overleaf but I haven't set up rclone"
-
-**Steps:**
-1. Check `rclone listremotes` → empty
-2. Guide user through `rclone config`:
-   - New remote → name: `dropbox` → type: `dropbox` → follow OAuth
-3. Verify: `rclone lsd dropbox:`
-4. Find Overleaf folder and proceed with sync
-
-## Resources
-- `resources/onboarding.md` — Step-by-step setup guide for new users (install rclone, link Overleaf to Dropbox, configure remote, create shell alias)
-
-## Limits
-- This skill syncs files TO Overleaf (one-way push). It does not pull changes FROM Overleaf.
-- For bidirectional sync, use `rclone bisync` (advanced, not covered here due to conflict risks).
-- This skill assumes Overleaf's Dropbox integration is already enabled in the Overleaf project settings.
-- Does not handle Overleaf Git integration (use standard git for that workflow).
-- Does not compile LaTeX — Overleaf handles compilation after receiving the files.
+- **Auth error / websocket error**: Open Overleaf in Chrome browser first (`open -a "Google Chrome" "https://www.overleaf.com/project"` then wait 5s) to refresh cookies, then retry
+- **"scheme https is invalid" (websocket redirect bug)**: The default host `overleaf.com` causes a 301→`www.overleaf.com` redirect that breaks websocket. Fix: set `PYOVERLEAF_HOST=www.overleaf.com`:
+  ```bash
+  cat main.tex | PYOVERLEAF_HOST=www.overleaf.com pyoverleaf write "Project/main.tex"
+  ```
+- **Keychain Access Denied** (macOS): pyoverleaf needs keychain access to read browser cookies. User must run `pyoverleaf ls` in their terminal and click "Always Allow" on the keychain prompt
+- **Project not found**: Use exact project name (case-sensitive), check with `pyoverleaf ls`
+- **Permission denied**: User may not have edit access to the project

@@ -1,17 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronLeft, Check, GitBranch, User, Mail, LogIn, ExternalLink, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, LogIn, Loader2, FileText } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import ClaudeLogo from './ClaudeLogo';
 import CursorLogo from './CursorLogo';
 import CodexLogo from './CodexLogo';
 import LoginModal from './LoginModal';
 import { authenticatedFetch } from '../utils/api';
-import { useAuth } from '../contexts/AuthContext';
 import { IS_PLATFORM } from '../constants/config';
+import { isTelemetryEnabled, setTelemetryEnabled } from '../utils/telemetry';
+import betaAgreementTextZh from '../../docs/internal-beta-user-agreement.zh-CN.md?raw';
+import betaAgreementTextEn from '../../docs/internal-beta-user-agreement.en-US.md?raw';
 
 const Onboarding = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [gitName, setGitName] = useState('');
-  const [gitEmail, setGitEmail] = useState('');
+  const [agreedToBetaTerms, setAgreedToBetaTerms] = useState(false);
+  const [telemetryConsent, setTelemetryConsentState] = useState(() => isTelemetryEnabled());
+  const [agreementLanguage, setAgreementLanguage] = useState(() => {
+    if (typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('zh')) {
+      return 'zh-CN';
+    }
+    return 'en-US';
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -39,26 +49,7 @@ const Onboarding = ({ onComplete }) => {
     error: null
   });
 
-  const { user } = useAuth();
-
   const prevActiveLoginProviderRef = useRef(undefined);
-
-  useEffect(() => {
-    loadGitConfig();
-  }, []);
-
-  const loadGitConfig = async () => {
-    try {
-      const response = await authenticatedFetch('/api/user/git-config');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.gitName) setGitName(data.gitName);
-        if (data.gitEmail) setGitEmail(data.gitEmail);
-      }
-    } catch (error) {
-      console.error('Error loading git config:', error);
-    }
-  };
 
   useEffect(() => {
     const prevProvider = prevActiveLoginProviderRef.current;
@@ -182,41 +173,20 @@ const Onboarding = ({ onComplete }) => {
 
   const handleNextStep = async () => {
     setError('');
+    const isChinese = agreementLanguage === 'zh-CN';
 
-    // Step 0: Git config validation and submission
     if (currentStep === 0) {
-      if (!gitName.trim() || !gitEmail.trim()) {
-        setError('Both git name and email are required');
+      if (!agreedToBetaTerms) {
+        setError(
+          isChinese
+            ? '请先勾选同意《Vibe Lab 内测用户确认协议（Beta）》'
+            : 'Please check the box to accept the Vibe Lab Beta User Confirmation Agreement first.'
+        );
         return;
       }
 
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(gitEmail)) {
-        setError('Please enter a valid email address');
-        return;
-      }
-
-      setIsSubmitting(true);
-      try {
-        // Save git config to backend (which will also apply git config --global)
-        const response = await authenticatedFetch('/api/user/git-config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gitName, gitEmail })
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to save git configuration');
-        }
-
-        setCurrentStep(currentStep + 1);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setIsSubmitting(false);
-      }
+      setTelemetryEnabled(telemetryConsent);
+      setCurrentStep(currentStep + 1);
       return;
     }
 
@@ -254,9 +224,9 @@ const Onboarding = ({ onComplete }) => {
 
   const steps = [
     {
-      title: 'Git Configuration',
-      description: 'Set up your git identity for commits',
-      icon: GitBranch,
+      title: 'Agreement',
+      description: 'Review and accept beta agreement',
+      icon: FileText,
       required: true
     },
     {
@@ -267,61 +237,110 @@ const Onboarding = ({ onComplete }) => {
     }
   ];
 
+  const isChinese = agreementLanguage === 'zh-CN';
+  const agreementText = isChinese ? betaAgreementTextZh : betaAgreementTextEn;
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
         return (
           <div className="space-y-6">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <GitBranch className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
               </div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">Git Configuration</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                {isChinese ? 'Vibe Lab 内测用户确认' : 'Vibe Lab Beta User Confirmation'}
+              </h2>
               <p className="text-muted-foreground">
-                Configure your git identity to ensure proper attribution for your commits
+                {isChinese
+                  ? '首次使用前，请确认内测协议与数据使用选项。'
+                  : 'Before first use, review the beta agreement and data usage options.'}
               </p>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="gitName" className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-                  <User className="w-4 h-4" />
-                  Git Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="gitName"
-                  value={gitName}
-                  onChange={(e) => setGitName(e.target.value)}
-                  className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="John Doe"
-                  required
-                  disabled={isSubmitting}
-                />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  This will be used as: git config --global user.name
-                </p>
-              </div>
+            <div className="flex justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setAgreementLanguage('zh-CN')}
+                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  isChinese
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-muted text-foreground hover:bg-muted/80'
+                }`}
+                disabled={isSubmitting}
+              >
+                中文
+              </button>
+              <button
+                type="button"
+                onClick={() => setAgreementLanguage('en-US')}
+                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  !isChinese
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-muted text-foreground hover:bg-muted/80'
+                }`}
+                disabled={isSubmitting}
+              >
+                English
+              </button>
+            </div>
 
-              <div>
-                <label htmlFor="gitEmail" className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-                  <Mail className="w-4 h-4" />
-                  Git Email <span className="text-red-500">*</span>
-                </label>
+            <div className="rounded-lg border border-border bg-muted/20 p-4 max-h-[28rem] overflow-y-auto text-sm leading-6 text-foreground">
+              <div className="prose prose-sm max-w-none text-foreground dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-code:text-foreground prose-blockquote:text-muted-foreground">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h1: ({node, ...props}) => <h1 className="text-xl mb-3" {...props} />,
+                    h2: ({node, ...props}) => <h2 className="text-base mt-5 mb-2" {...props} />,
+                    h3: ({node, ...props}) => <h3 className="text-sm mt-4 mb-2" {...props} />,
+                    blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-border pl-3 italic" {...props} />,
+                    ul: ({node, ...props}) => <ul className="list-disc pl-5" {...props} />,
+                    ol: ({node, ...props}) => <ol className="list-decimal pl-5" {...props} />,
+                    code: ({node, inline, className, children, ...props}) => (
+                      inline ? (
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs" {...props}>{children}</code>
+                      ) : (
+                        <code className="block rounded bg-muted p-2 text-xs whitespace-pre-wrap" {...props}>{children}</code>
+                      )
+                    ),
+                  }}
+                >
+                  {agreementText}
+                </ReactMarkdown>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+              <label className="flex items-start gap-3 text-sm text-foreground">
                 <input
-                  type="email"
-                  id="gitEmail"
-                  value={gitEmail}
-                  onChange={(e) => setGitEmail(e.target.value)}
-                  className="w-full px-4 py-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="john@example.com"
-                  required
+                  type="checkbox"
+                  checked={agreedToBetaTerms}
+                  onChange={(e) => setAgreedToBetaTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
                   disabled={isSubmitting}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  This will be used as: git config --global user.email
-                </p>
-              </div>
+                <span>
+                  {isChinese
+                    ? '我已阅读并同意《Vibe Lab 内测用户确认协议（Beta）》，理解本服务处于内测阶段。'
+                    : 'I have read and agree to the Vibe Lab Beta User Confirmation Agreement and understand this service is in beta.'}
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={telemetryConsent}
+                  onChange={(e) => setTelemetryConsentState(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
+                  disabled={isSubmitting}
+                />
+                <span>
+                  {isChinese
+                    ? '同意将我的使用数据用于改进 Vibe Lab 的模型和功能（推荐）。如不同意，你仍可继续使用，并可在设置中随时修改。'
+                    : 'Allow my usage data to improve Vibe Lab models and features (recommended). You can still continue without this and change it anytime in Settings.'}
+                </span>
+              </label>
             </div>
           </div>
         );
@@ -452,9 +471,9 @@ const Onboarding = ({ onComplete }) => {
   const isStepValid = () => {
     switch (currentStep) {
       case 0:
-        return gitName.trim() && gitEmail.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gitEmail);
+        return agreedToBetaTerms;
       case 1:
-        return true; 
+        return true;
       default:
         return false;
     }
@@ -577,6 +596,7 @@ const Onboarding = ({ onComplete }) => {
           provider={activeLoginProvider}
           project={selectedProject}
           onComplete={handleLoginComplete}
+          isOnboarding={true}
         />
       )}
     </>

@@ -176,7 +176,11 @@
       "showingOf": "Showing {{shown}} of {{total}} messages",
       "scrollToLoad": "Scroll up to load more",
       "showingLast": "Showing last {{count}} messages ({{total}} total)",
-      "loadEarlier": "Load earlier messages"
+      "loadEarlier": "Load earlier messages",
+      "loadAll": "Load all messages",
+      "loadingAll": "Loading all messages...",
+      "allLoaded": "All messages loaded",
+      "perfWarning": "All messages loaded — scrolling may be slower. Click \"Scroll to bottom\" to restore performance."
     }
   },
   "shell": {
@@ -202,13 +206,41 @@
     "startSession": "Start a new Claude session",
     "resumeSession": "Resume session: {{displayName}}...",
     "runCommand": "Run {{command}} in {{projectName}}",
-    "startCli": "Starting Claude CLI in {{projectName}}",
-    "defaultCommand": "command"
+    "openTerminal": "Open terminal in {{projectName}}",
+    "startCli": "Starting Claude CLI in {{projectName}}"
   },
   "projectSelection": {
     "startChatWithProvider": "Select a project to start chatting with {{provider}}"
   },
   "tasks": {
-    "nextTaskPrompt": "Start the next task"
+    "nextTaskPrompt": "Start the next task",
+    "compact": {
+      "progress": "{{done}}/{{total}} done · {{pending}} pending",
+      "useInChat": "Use in Chat",
+      "allTasks": "All Tasks",
+      "allDone": "All tasks completed",
+      "done": "Done",
+      "inProgress": "In Progress",
+      "pending": "Pending",
+      "expand": "Expand task progress",
+      "collapse": "Collapse task progress"
+    }
+  },
+  "pipelineOnboarding": {
+    "noBrief": {
+      "title": "Set Up Your Research Pipeline",
+      "description": "Describe your research idea below and the agent will interactively build your pipeline, generating a research brief and task list.",
+      "stepsLabel": "What to include",
+      "step1": "Your research topic and high-level goal",
+      "step2": "Scope, boundaries, and target venue (if any)",
+      "step3": "Preferred methods and evaluation approach",
+      "buttonLabel": "Use in Chat"
+    },
+    "noTasks": {
+      "title": "Generate Tasks from Your Brief",
+      "description": "A research brief exists but no tasks have been generated yet. Let the agent read your brief and create a task list.",
+      "briefExists": "research_brief.json detected",
+      "buttonLabel": "Use in Chat"
+    }
   }
 }

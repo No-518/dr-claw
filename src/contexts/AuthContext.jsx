@@ -117,6 +117,7 @@ export const AuthProvider = ({ children }) => {
         setToken(data.token);
         setUser(data.user);
         localStorage.setItem('auth-token', data.token);
+        await checkOnboardingStatus();
         return { success: true };
       } else {
         setError(data.error || 'Login failed');
@@ -142,6 +143,7 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user);
         setNeedsSetup(false);
         localStorage.setItem('auth-token', data.token);
+        await checkOnboardingStatus();
         return { success: true };
       } else {
         setError(data.error || 'Registration failed');
@@ -159,7 +161,7 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('auth-token');
-    
+
     // Optional: Call logout endpoint for logging
     if (token) {
       api.auth.logout().catch(error => {

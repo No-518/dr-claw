@@ -7,8 +7,8 @@ import rehypeKatex from 'rehype-katex';
 import {
   FlaskConical, RefreshCw, FileText, BookOpen, Settings2, Lightbulb,
   GitBranch, FolderOpen, ChevronDown, ChevronRight, ExternalLink,
-  FileCode, Beaker, ClipboardList, Brain, Save, AlertCircle,
-  Sparkles, Copy, Check, PenTool
+  FileCode, Beaker, Brain, Save, AlertCircle,
+  Sparkles, Copy, Check, PenTool, Target, Clock3, ListChecks, MessageSquare
 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
@@ -30,6 +30,36 @@ async function readProjectJson(projectName, relativePath) {
     console.warn(`ResearchLab: failed to read ${relativePath}:`, e.message);
   }
   return null;
+}
+
+/** Convert absolute path to relative to project root for API reads; if already relative, return as-is */
+function toRelativePath(fullPath, projectRoot) {
+  if (!fullPath || typeof fullPath !== 'string') return fullPath;
+  const p = fullPath.replace(/\\/g, '/').trim();
+  const root = (projectRoot || '').replace(/\\/g, '/').replace(/\/+$/, '') + '/';
+  if (root !== '/' && p.startsWith(root)) return p.slice(root.length).replace(/^\/+/, '');
+  if (p.startsWith('/') && projectRoot) return p; // absolute but not under projectRoot — keep for display only
+  return p;
+}
+
+/** Collect all relative file paths from the file tree (for existence checks, to avoid 404s) */
+function collectAllRelativePaths(nodes, projectRoot) {
+  const out = new Set();
+  if (!nodes || !Array.isArray(nodes)) return out;
+  const normRoot = projectRoot
+    ? (projectRoot.replace(/[/\\]+$/, '') + '/').replace(/\\/g, '/')
+    : '';
+
+  function walk(items) {
+    for (const item of items) {
+      const pathNorm = (item.path || '').replace(/\\/g, '/');
+      const rel = normRoot ? pathNorm.replace(normRoot, '').replace(/^\/+/, '') : pathNorm;
+      if (item.type === 'file') out.add(rel);
+      if (item.type === 'directory' && Array.isArray(item.children)) walk(item.children);
+    }
+  }
+  walk(nodes);
+  return out;
 }
 
 /** Walk file tree and collect files matching a predicate on the relative path */
@@ -84,7 +114,7 @@ function classifyArtifact(name, relativePath) {
     return { stage: 'Code Survey', icon: FileCode, color: 'cyan' };
   }
   if (rp.startsWith('Experiment/core_code/')) {
-    if (name === 'coding_plan_agent.json') return { stage: 'Implementation Plan', icon: ClipboardList, color: 'purple' };
+    if (name === 'coding_plan_agent.json') return { stage: 'Implementation Plan', icon: FileText, color: 'purple' };
     if (name.startsWith('machine_learning')) return { stage: 'ML Development', icon: Beaker, color: 'orange' };
     if (name.startsWith('judge_agent')) return { stage: 'Judge', icon: AlertCircle, color: 'yellow' };
     return { stage: 'ML Development', icon: Beaker, color: 'orange' };
@@ -111,7 +141,7 @@ function classifyArtifact(name, relativePath) {
     return { stage: 'Engineering Expert', icon: Brain, color: 'indigo' };
   if (name === 'repo_acquisition_agent.json') return { stage: 'Repo Acquisition', icon: GitBranch, color: 'green' };
   if (name === 'code_survey_agent.json') return { stage: 'Code Survey', icon: FileCode, color: 'cyan' };
-  if (name === 'coding_plan_agent.json') return { stage: 'Implementation Plan', icon: ClipboardList, color: 'purple' };
+  if (name === 'coding_plan_agent.json') return { stage: 'Implementation Plan', icon: FileText, color: 'purple' };
   if (name.startsWith('machine_learning')) return { stage: 'ML Development', icon: Beaker, color: 'orange' };
   if (name.startsWith('judge_agent')) return { stage: 'Judge', icon: AlertCircle, color: 'yellow' };
   if (name.startsWith('experiment_analysis')) return { stage: 'Experiment Analysis', icon: Beaker, color: 'teal' };
@@ -132,6 +162,43 @@ const BADGE_COLORS = {
   gray: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
 };
 
+const IDEATION_STAGES = new Set([
+  'Data Loading',
+  'Prepare',
+  'Idea Generation',
+  'Medical Expert',
+  'Engineering Expert',
+]);
+
+const EXPERIMENT_STAGES = new Set([
+  'Repo Acquisition',
+  'Code Survey',
+  'Implementation Plan',
+  'ML Development',
+  'Judge',
+  'Experiment Analysis',
+  'Other',
+]);
+
+const PUBLICATION_STAGES = new Set(['Paper Writing']);
+const DEFAULT_RESEARCH_BRIEF_FILENAME = 'research_brief.json';
+const DEFAULT_TASKS_FILENAME = 'tasks.json';
+const TASK_STAGE_ORDER = ['ideation', 'experiment', 'publication', 'unassigned'];
+const TASK_STAGE_META = {
+  ideation: { label: 'Ideation', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' },
+  experiment: { label: 'Experiment', className: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300' },
+  publication: { label: 'Publication', className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300' },
+  unassigned: { label: 'Unassigned', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
+};
+const TASK_STATUS_META = {
+  pending: { label: 'Pending', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
+  'in-progress': { label: 'In Progress', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+  done: { label: 'Done', className: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
+  review: { label: 'Review', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  deferred: { label: 'Deferred', className: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' },
+  cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+};
+
 /* ------------------------------------------------------------------ */
 /*  Sub-components (cards)                                             */
 /* ------------------------------------------------------------------ */
@@ -143,7 +210,7 @@ function OverviewCard({ instance, config }) {
   const modeColor = mode === 'Plan'
     ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
     : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300';
-  const taskText = instance?.task2 || instance?.task1 || '';
+  const taskText = instance?.task2 || instance?.task1 || instance?.ideas || '';
   const shouldTruncate = taskText.length > 400;
   const displayedText = (shouldTruncate && !isExpanded)
     ? taskText.slice(0, 400) + '…'
@@ -172,9 +239,9 @@ function OverviewCard({ instance, config }) {
           )}
         </div>
       )}
-      {instance?.instance_id && (
+      {(instance?.instance_id ?? instance?.instance_path) && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Instance: <code className="bg-muted px-1 rounded">{instance.instance_id}</code></span>
+          <span>Instance: <code className="bg-muted px-1 rounded">{instance.instance_id ?? instance.instance_path?.split('/').pop()}</code></span>
           {config?.category && <span>Category: <code className="bg-muted px-1 rounded">{config.category}</code></span>}
         </div>
       )}
@@ -272,29 +339,240 @@ function PapersCard({ papers }) {
   );
 }
 
-/** Pipeline config summary */
-function PipelineCard({ config }) {
-  if (!config) return null;
-  const entries = [
-    { label: 'Instance', value: config.instance_path?.split('/').pop() },
-    { label: 'Task Level', value: config.task_level },
-    { label: 'Category', value: config.category },
-    { label: 'Dataset', value: config.dataset_path?.split('/').pop() || '—' },
-  ].filter(e => e.value);
-
+function StageSection({ title, icon: Icon, badgeClass, expanded, onToggle, children }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-        <Settings2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-        Pipeline Configuration
-      </h3>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-        {entries.map(e => (
-          <React.Fragment key={e.label}>
-            <span className="text-muted-foreground text-xs">{e.label}</span>
-            <span className="text-foreground text-xs font-medium truncate">{e.value}</span>
-          </React.Fragment>
-        ))}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 text-left hover:bg-muted/40 rounded-md px-1.5 py-1"
+      >
+        {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+        <Icon className="w-4 h-4" />
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full ${badgeClass}`}>Stage</span>
+      </button>
+      {expanded && <div className="space-y-3">{children}</div>}
+    </div>
+  );
+}
+
+function TaskPipelineBoard({ tasks, isLoading, onOpenTasksFile, onOpenBriefFile, onNavigateToChat }) {
+  const [openStages, setOpenStages] = useState({});
+
+  useEffect(() => {
+    if (!Array.isArray(tasks) || tasks.length === 0) return;
+    setOpenStages((prev) => {
+      if (Object.keys(prev).length > 0) return prev;
+      return { ideation: true, experiment: true, publication: true, unassigned: false };
+    });
+  }, [tasks]);
+
+  const normalizedTasks = useMemo(
+    () => (Array.isArray(tasks) ? tasks : []).map((task) => ({
+      ...task,
+      stage: TASK_STAGE_META[task?.stage] ? task.stage : 'unassigned',
+      status: TASK_STATUS_META[task?.status] ? task.status : 'pending',
+    })),
+    [tasks],
+  );
+
+  const summary = useMemo(() => {
+    const total = normalizedTasks.length;
+    const done = normalizedTasks.filter((task) => task.status === 'done').length;
+    const inProgress = normalizedTasks.filter((task) => task.status === 'in-progress').length;
+    const pending = normalizedTasks.filter((task) => task.status === 'pending').length;
+    const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { total, done, inProgress, pending, progress };
+  }, [normalizedTasks]);
+
+  const groupedTasks = useMemo(() => {
+    const groups = {
+      ideation: [],
+      experiment: [],
+      publication: [],
+      unassigned: [],
+    };
+    normalizedTasks.forEach((task) => {
+      groups[task.stage].push(task);
+    });
+    Object.values(groups).forEach((list) => {
+      list.sort((a, b) => Number(a.id) - Number(b.id));
+    });
+    return groups;
+  }, [normalizedTasks]);
+
+  const firstPendingTaskId = useMemo(() => {
+    const first = normalizedTasks.find((task) => task.status === 'pending');
+    return first ? String(first.id) : null;
+  }, [normalizedTasks]);
+
+  const toggleStage = useCallback((stage) => {
+    setOpenStages((prev) => ({ ...prev, [stage]: !(prev[stage] ?? false) }));
+  }, []);
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-sky-50 via-cyan-50 to-emerald-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-white/80 dark:bg-slate-800/80 border border-border flex items-center justify-center">
+              <ListChecks className="w-4 h-4 text-cyan-700 dark:text-cyan-300" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                Pipeline Task List
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Stage-oriented task board synced from <code className="bg-muted px-1 rounded">{`.pipeline/tasks/${DEFAULT_TASKS_FILENAME}`}</code>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="sm" onClick={onOpenBriefFile}>
+              <FileText className="w-3.5 h-3.5 mr-1" />
+              Open research_brief.json
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onOpenTasksFile}>
+              <FileText className="w-3.5 h-3.5 mr-1" />
+              Open tasks.json
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading pipeline tasks...</div>
+        ) : summary.total === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <MessageSquare className="w-8 h-8 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">
+              No tasks found yet. Start a conversation in Chat to generate your research pipeline and tasks.
+            </p>
+            {onNavigateToChat && (
+              <Button
+                size="sm"
+                className="text-white bg-gradient-to-r from-cyan-500 via-sky-500 to-emerald-500 hover:from-cyan-400 hover:via-sky-400 hover:to-emerald-400"
+                onClick={() => onNavigateToChat()}
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                Go to Chat
+              </Button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">Total</p>
+                <p className="text-sm font-semibold text-foreground">{summary.total}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">Done</p>
+                <p className="text-sm font-semibold text-green-600 dark:text-green-400">{summary.done}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">In Progress</p>
+                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">{summary.inProgress}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">Pending</p>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{summary.pending}</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-background p-2.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                <span className="flex items-center gap-1"><Target className="w-3.5 h-3.5" /> Progress</span>
+                <span>{summary.progress}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-300"
+                  style={{ width: `${summary.progress}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              {TASK_STAGE_ORDER.map((stage) => {
+                const stageTasks = groupedTasks[stage];
+                if (!stageTasks || stageTasks.length === 0) return null;
+                const isOpen = openStages[stage] ?? true;
+                const meta = TASK_STAGE_META[stage];
+                return (
+                  <div key={stage} className="rounded-lg border border-border overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => toggleStage(stage)}
+                      className="w-full px-3 py-2 flex items-center gap-2 hover:bg-muted/40 text-left"
+                    >
+                      {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${meta.className}`}>{meta.label}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">{stageTasks.length}</span>
+                    </button>
+                    {isOpen && (
+                      <div className="border-t border-border bg-background/60">
+                        {stageTasks.map((task) => {
+                          const statusMeta = TASK_STATUS_META[task.status] || TASK_STATUS_META.pending;
+                          const isFirstPendingTask = task.status === 'pending' && String(task.id) === firstPendingTaskId;
+                          return (
+                            <div key={`${stage}-${task.id}`} className="px-3 py-2 border-b border-border last:border-b-0">
+                              <div className="flex items-start gap-2">
+                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground mt-0.5">#{task.id}</span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium text-foreground truncate">{task.title || 'Untitled Task'}</p>
+                                  {task.description && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{task.description}</p>
+                                  )}
+                                  {Array.isArray(task.suggestedSkills) && task.suggestedSkills.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {task.suggestedSkills.slice(0, 3).map((skill) => (
+                                        <span key={`${task.id}-${skill}`} className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300">
+                                          {skill}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusMeta.className}`}>{statusMeta.label}</span>
+                                  {isFirstPendingTask && onNavigateToChat && (
+                                    <div className="mt-0.5 inline-flex flex-col items-end gap-1">
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 animate-pulse">
+                                        Next
+                                      </span>
+                                      <Button
+                                        size="sm"
+                                        className="h-7 px-2.5 text-[11px] font-semibold text-white bg-gradient-to-r from-cyan-500 via-sky-500 to-emerald-500 hover:from-cyan-400 hover:via-sky-400 hover:to-emerald-400 shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_8px_18px_rgba(16,185,129,0.35)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_20px_rgba(34,211,238,0.35)] transition-all"
+                                        onClick={() => onNavigateToChat()}
+                                      >
+                                        <Sparkles className="w-3 h-3 mr-1.5" />
+                                        <MessageSquare className="w-3 h-3 mr-1" />
+                                        Go to Chat
+                                      </Button>
+                                    </div>
+                                  )}
+                                  {task.status === 'in-progress' && (
+                                    <span className="text-[10px] text-blue-600 dark:text-blue-300 inline-flex items-center gap-1">
+                                      <Clock3 className="w-3 h-3" />
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -426,8 +704,14 @@ async function readProjectText(projectName, relativePath) {
   return null;
 }
 
+/** Helper: only request file if it might exist (avoids 404s when project has no pipeline output yet) */
+function hasFile(fileSet, relativePath) {
+  if (!fileSet) return false;
+  return fileSet.has(relativePath);
+}
+
 /** Final Idea card — shows the selected idea rendered as markdown */
-function IdeaCard({ projectName, config }) {
+function IdeaCard({ projectName, config, projectFileSet }) {
   const [ideaText, setIdeaText] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(true);
@@ -438,25 +722,32 @@ function IdeaCard({ projectName, config }) {
 
   useEffect(() => {
     if (!projectName) { setLoading(false); return; }
+    // Wait for file tree to load so we can avoid probing missing files (prevents 404 spam).
+    if (projectFileSet === null) { setLoading(true); return; }
 
     setLoading(true);
 
     (async () => {
       try {
-        // --- New layout: Ideation/ideas/ ---
-        const ideasDir = 'Ideation/ideas';
+        // --- New layout or legacy path: prefer config.ideas_path_relative (compat with old projects) ---
+        const ideasDir = config?.ideas_path_relative || 'Ideation/ideas';
 
-        // 1. Primary: read selected_idea.txt from new path
-        const selectedTxt = await readProjectText(projectName, `${ideasDir}/selected_idea.txt`);
-        if (selectedTxt) {
-          setIdeaText(selectedTxt);
-          setLoading(false);
-          return;
+        // 1. Primary: read selected_idea.txt from ideas dir (skip request if file not in tree to avoid 404)
+        const selectedPath = `${ideasDir}/selected_idea.txt`;
+        if (hasFile(projectFileSet, selectedPath)) {
+          const selectedTxt = await readProjectText(projectName, selectedPath);
+          if (selectedTxt) {
+            setIdeaText(selectedTxt);
+            setLoading(false);
+            return;
+          }
         }
 
         // 2. Fallback: read raw_idea_N.txt in reverse order (latest first)
         for (let i = 10; i >= 1; i--) {
-          const rawTxt = await readProjectText(projectName, `${ideasDir}/raw_idea_${i}.txt`);
+          const rawPath = `${ideasDir}/raw_idea_${i}.txt`;
+          if (!hasFile(projectFileSet, rawPath)) continue;
+          const rawTxt = await readProjectText(projectName, rawPath);
           if (rawTxt) {
             setIdeaText(rawTxt);
             setLoading(false);
@@ -466,12 +757,14 @@ function IdeaCard({ projectName, config }) {
 
         // 3. Fallback: read from logs JSON
         const selectFile = `${ideasDir}/logs/idea_generation_agent_iter_select.json`;
-        const selectData = await readProjectJson(projectName, selectFile);
-        if (selectData?.context_variables?.final_selected_idea_data) {
-          const data = selectData.context_variables.final_selected_idea_data;
-          setIdeaText(data.selected_idea_text || data.raw_idea || null);
-          setLoading(false);
-          return;
+        if (hasFile(projectFileSet, selectFile)) {
+          const selectData = await readProjectJson(projectName, selectFile);
+          if (selectData?.context_variables?.final_selected_idea_data) {
+            const data = selectData.context_variables.final_selected_idea_data;
+            setIdeaText(data.selected_idea_text || data.raw_idea || null);
+            setLoading(false);
+            return;
+          }
         }
 
         // --- Legacy layout: cache_path based ---
@@ -482,14 +775,19 @@ function IdeaCard({ projectName, config }) {
             : cachePath;
           const cacheDir = relativeCacheBase.replace(/\/+$/, '');
 
-          const legacySelected = await readProjectText(projectName, `${cacheDir}/selected_idea.txt`);
-          if (legacySelected) {
-            setIdeaText(legacySelected);
-            setLoading(false);
-            return;
+          const legacySelectedPath = `${cacheDir}/selected_idea.txt`;
+          if (hasFile(projectFileSet, legacySelectedPath)) {
+            const legacySelected = await readProjectText(projectName, legacySelectedPath);
+            if (legacySelected) {
+              setIdeaText(legacySelected);
+              setLoading(false);
+              return;
+            }
           }
           for (let i = 10; i >= 1; i--) {
-            const rawTxt = await readProjectText(projectName, `${cacheDir}/raw_idea_${i}.txt`);
+            const rawPath = `${cacheDir}/raw_idea_${i}.txt`;
+            if (!hasFile(projectFileSet, rawPath)) continue;
+            const rawTxt = await readProjectText(projectName, rawPath);
             if (rawTxt) {
               setIdeaText(rawTxt);
               setLoading(false);
@@ -497,12 +795,14 @@ function IdeaCard({ projectName, config }) {
             }
           }
           const legacySelectFile = `${cacheDir}/agents/idea_generation_agent_iter_select.json`;
-          const legacyData = await readProjectJson(projectName, legacySelectFile);
-          if (legacyData?.context_variables?.final_selected_idea_data) {
-            const data = legacyData.context_variables.final_selected_idea_data;
-            setIdeaText(data.selected_idea_text || data.raw_idea || null);
-            setLoading(false);
-            return;
+          if (hasFile(projectFileSet, legacySelectFile)) {
+            const legacyData = await readProjectJson(projectName, legacySelectFile);
+            if (legacyData?.context_variables?.final_selected_idea_data) {
+              const data = legacyData.context_variables.final_selected_idea_data;
+              setIdeaText(data.selected_idea_text || data.raw_idea || null);
+              setLoading(false);
+              return;
+            }
           }
         }
       } catch (e) {
@@ -511,7 +811,7 @@ function IdeaCard({ projectName, config }) {
       setIdeaText(null);
       setLoading(false);
     })();
-  }, [projectName, config]);
+  }, [projectName, config, projectFileSet]);
 
   const handleCopy = useCallback(() => {
     if (!ideaText) return;
@@ -670,8 +970,24 @@ function FileViewer({ projectName, file, onClose }) {
     setDirty(false);
     setSaveStatus(null);
     api.readFile(projectName, file.relativePath)
-      .then(r => r.json())
-      .then(d => setContent(d?.content ?? ''))
+      .then(async (response) => {
+        if (!response?.ok) {
+          return null;
+        }
+
+        const rawText = await response.text();
+        if (!rawText) {
+          return { content: '' };
+        }
+
+        try {
+          return JSON.parse(rawText);
+        } catch {
+          // Fallback for non-JSON error pages or unexpected payloads.
+          return { content: rawText };
+        }
+      })
+      .then((data) => setContent(data?.content ?? ''))
       .catch(() => setContent(''))
       .finally(() => setLoading(false));
   }, [projectName, file]);
@@ -719,27 +1035,37 @@ function FileViewer({ projectName, file, onClose }) {
   );
 }
 
-function UsageGuideNotice({ t }) {
+function UsageGuideNotice({ t, onNavigateToChat }) {
   return (
-    <div className="rounded-lg border border-amber-300/60 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-900/20 p-4">
+    <div className="rounded-lg border border-blue-300/60 dark:border-blue-700/60 bg-blue-50/80 dark:bg-blue-900/20 p-4">
       <div className="flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+        <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">
             {t('researchLabGuide.title')}
           </h3>
-          <p className="text-xs text-amber-900/90 dark:text-amber-200/90">
+          <p className="text-xs text-blue-900/90 dark:text-blue-200/90">
             {t('researchLabGuide.description')}
           </p>
-          <ol className="list-decimal pl-4 space-y-1 text-xs text-amber-900/90 dark:text-amber-200/90">
+          <ol className="list-decimal pl-4 space-y-1 text-xs text-blue-900/90 dark:text-blue-200/90">
             <li>{t('researchLabGuide.step1')}</li>
             <li>{t('researchLabGuide.step2')}</li>
             <li>{t('researchLabGuide.step3')}</li>
             <li>{t('researchLabGuide.step4')}</li>
           </ol>
-          <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
-            {t('researchLabGuide.readmeHint')}
+          <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
+            {t('researchLabGuide.interfaceMap')}
           </p>
+          {onNavigateToChat && (
+            <Button
+              size="sm"
+              className="mt-1 text-white bg-gradient-to-r from-cyan-500 via-sky-500 to-emerald-500 hover:from-cyan-400 hover:via-sky-400 hover:to-emerald-400"
+              onClick={onNavigateToChat}
+            >
+              <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+              Go to Chat
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -750,38 +1076,109 @@ function UsageGuideNotice({ t }) {
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
-function ResearchLab({ selectedProject }) {
+function ResearchLab({ selectedProject, onNavigateToChat }) {
   const { t } = useTranslation('common');
   const [loading, setLoading] = useState(false);
   const [instance, setInstance] = useState(null);
   const [config, setConfig] = useState(null);
   const [artifacts, setArtifacts] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [projectFileSet, setProjectFileSet] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [sectionsOpen, setSectionsOpen] = useState({
+    ideation: true,
+    experiment: true,
+    publication: true,
+  });
 
   const projectRoot = selectedProject?.fullPath || selectedProject?.path || '';
   const projectName = selectedProject?.name;
+  const projectIdentity = `${projectRoot || ''}::${projectName || ''}`;
+
+  useEffect(() => {
+    if (!projectName) {
+      setSelectedFile(null);
+      return;
+    }
+    const briefRelativePath = `.pipeline/docs/${DEFAULT_RESEARCH_BRIEF_FILENAME}`;
+    setSelectedFile({
+      name: DEFAULT_RESEARCH_BRIEF_FILENAME,
+      relativePath: briefRelativePath,
+      path: `${projectRoot.replace(/[/\\]+$/, '')}/${briefRelativePath}`,
+    });
+  }, [projectIdentity, projectName, projectRoot]);
 
   const loadData = useCallback(async () => {
     if (!projectName) {
       setInstance(null);
       setConfig(null);
       setArtifacts([]);
+      setTasks([]);
+      setProjectFileSet(null);
       return;
     }
     setLoading(true);
+    setTasksLoading(true);
+    setInstance(null);
+    setConfig(null);
     try {
-      // Load instance.json and pipeline_config.json
-      const [inst, conf] = await Promise.all([
-        readProjectJson(projectName, 'instance.json'),
-        readProjectJson(projectName, 'pipeline_config.json'),
+      const [tasksResponse, filesResponse] = await Promise.all([
+        api.get(`/taskmaster/tasks/${encodeURIComponent(projectName)}`).catch(() => null),
+        api.getFiles(projectName),
       ]);
-      setInstance(inst);
-      setConfig(conf);
+      const taskData = tasksResponse && tasksResponse.ok ? await tasksResponse.json() : null;
+      setTasks(Array.isArray(taskData?.tasks) ? taskData.tasks : []);
 
       // Load file tree and collect log artifacts from new layout + legacy cache
-      const res = await api.getFiles(projectName);
-      const data = await res.json();
+      const filesRawText = filesResponse?.ok ? await filesResponse.text() : '[]';
+      let data = [];
+      try {
+        data = filesRawText ? JSON.parse(filesRawText) : [];
+      } catch {
+        data = [];
+      }
       const tree = Array.isArray(data) ? data : [];
+      const fileSet = collectAllRelativePaths(tree, projectRoot);
+      setProjectFileSet(fileSet);
+
+      // Optional compatibility: read legacy metadata files only when they exist.
+      const hasInstanceFile = fileSet.has('instance.json');
+      const hasPipelineConfig = fileSet.has('pipeline_config.json');
+
+      if (hasInstanceFile || hasPipelineConfig) {
+        const [inst, pipelineConfig] = await Promise.all([
+          hasInstanceFile ? readProjectJson(projectName, 'instance.json') : Promise.resolve(null),
+          hasPipelineConfig ? readProjectJson(projectName, 'pipeline_config.json') : Promise.resolve(null),
+        ]);
+
+        // Prefer instance.json; merge in pipeline_config for old projects or missing keys
+        const merged = inst
+          ? { ...(pipelineConfig || {}), ...inst }
+          : pipelineConfig
+            ? { ...pipelineConfig, instance_path: pipelineConfig.instance_path }
+            : null;
+        setInstance(merged);
+
+        // Normalize for UI: support both new schema (Ideation.*, Experiment.*, instance) and old (*_path, task_level)
+        const ideasPath = merged?.Ideation?.ideas ?? merged?.ideas_path;
+        const referencesPath = merged?.Ideation?.references ?? merged?.references_path;
+        const conf = merged
+          ? {
+              ...merged,
+              instance: merged.instance ?? merged.instance_path,
+              dataset_path: merged.Experiment?.datasets ?? merged.datasets_path,
+              task_level: merged.idea_maturity ?? merged.task_level ?? undefined,
+              cache_path: merged.cache_path,
+              ideas_path: ideasPath,
+              references_path: referencesPath,
+              ideas_path_relative: toRelativePath(ideasPath, projectRoot) || 'Ideation/ideas',
+              references_path_relative: toRelativePath(referencesPath, projectRoot) || 'Ideation/references',
+            }
+          : null;
+        setConfig(conf);
+      }
+
       const logFiles = collectFiles(tree, projectRoot, (rel) => {
         if (!rel.endsWith('.json')) return false;
         // New layout: JSON files inside logs/ dirs under Ideation/ or Experiment/
@@ -797,10 +1194,16 @@ function ResearchLab({ selectedProject }) {
       console.error('ResearchLab load:', e);
     } finally {
       setLoading(false);
+      setTasksLoading(false);
     }
   }, [projectName, projectRoot]);
 
   useEffect(() => { loadData(); }, [loadData]);
+  const toggleSection = useCallback((key) => {
+    setSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const hasContent = instance || config || artifacts.length > 0 || tasks.length > 0;
 
   if (!selectedProject) {
     return (
@@ -809,8 +1212,6 @@ function ResearchLab({ selectedProject }) {
       </div>
     );
   }
-
-  const hasContent = instance || config || artifacts.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -834,70 +1235,94 @@ function ResearchLab({ selectedProject }) {
 
       {/* Body */}
       <ScrollArea className="flex-1">
-        {loading && !hasContent ? (
-          <div className="p-4 space-y-4 max-w-4xl mx-auto">
-            <UsageGuideNotice t={t} />
-            <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-              Loading research data...
-            </div>
-          </div>
-        ) : !hasContent ? (
-          <div className="p-4 space-y-4 max-w-4xl mx-auto">
-            <UsageGuideNotice t={t} />
-            <div className="flex flex-col items-center justify-center h-60 text-muted-foreground text-sm gap-3">
-              <FolderOpen className="w-14 h-14 opacity-40" />
-              <p>No research data found in this project.</p>
-              <p className="text-xs max-w-md text-center">
-                Start a research pipeline to generate <code className="bg-muted px-1 rounded">instance.json</code> and <code className="bg-muted px-1 rounded">pipeline_config.json</code> in the project root.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="p-4 space-y-4 max-w-4xl mx-auto">
-            <UsageGuideNotice t={t} />
+        <div className="p-4 max-w-[1380px] mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] gap-4 items-start">
+            <div className="space-y-4 min-w-0">
+              <UsageGuideNotice t={t} onNavigateToChat={onNavigateToChat} />
 
-            {/* Row 1: Overview + Pipeline Config */}
-            {(instance || config) && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2">
-                  {instance && <OverviewCard instance={instance} config={config} />}
-                </div>
-                <div>
-                  {config && <PipelineCard config={config} />}
-                </div>
-              </div>
-            )}
-
-            {/* Row 2: Source Papers */}
-            {instance?.source_papers?.length > 0 && (
-              <PapersCard papers={instance.source_papers} />
-            )}
-
-            {/* Row 3: Final Idea (markdown) */}
-            <IdeaCard projectName={projectName} config={config} />
-
-            {/* Row 4: Paper (main.pdf) */}
-            <PaperCard projectName={projectName} projectRoot={projectRoot} />
-
-            {/* Row 5: Artifacts */}
-            {artifacts.length > 0 && (
-              <ArtifactsCard
-                artifacts={artifacts}
-                onSelect={setSelectedFile}
-                selectedPath={selectedFile?.relativePath}
+              <TaskPipelineBoard
+                tasks={tasks}
+                isLoading={tasksLoading}
+                onNavigateToChat={onNavigateToChat}
+                onOpenBriefFile={() => setSelectedFile({
+                  name: DEFAULT_RESEARCH_BRIEF_FILENAME,
+                  relativePath: `.pipeline/docs/${DEFAULT_RESEARCH_BRIEF_FILENAME}`,
+                  path: `${projectRoot.replace(/[/\\]+$/, '')}/.pipeline/docs/${DEFAULT_RESEARCH_BRIEF_FILENAME}`,
+                })}
+                onOpenTasksFile={() => setSelectedFile({
+                  name: DEFAULT_TASKS_FILENAME,
+                  relativePath: `.pipeline/tasks/${DEFAULT_TASKS_FILENAME}`,
+                  path: `${projectRoot.replace(/[/\\]+$/, '')}/.pipeline/tasks/${DEFAULT_TASKS_FILENAME}`,
+                })}
               />
-            )}
 
-            {/* Row 6: File Viewer */}
-            {selectedFile && (
+              {loading && !hasContent ? (
+                <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                  Loading research data...
+                </div>
+              ) : !hasContent ? (
+                <div className="flex flex-col items-center justify-center h-60 text-muted-foreground text-sm gap-3">
+                  <FolderOpen className="w-14 h-14 opacity-40" />
+                  <p>No research data found in this project.</p>
+                  <p className="text-xs max-w-md text-center">
+                    Start a research pipeline to initialize project artifacts.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <Beaker className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                        Artifacts Explorer
+                      </h3>
+                      <span className="text-xs text-muted-foreground">{artifacts.length} files</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Browse artifacts generated across Ideation, Experiment, and Publication stages.
+                    </p>
+                    {artifacts.length > 0 ? (
+                      <ArtifactsCard
+                        artifacts={artifacts}
+                        onSelect={setSelectedFile}
+                        selectedPath={selectedFile?.relativePath}
+                      />
+                    ) : (
+                      <div className="text-xs text-muted-foreground rounded-md border border-dashed border-border px-3 py-4">
+                        No stage artifacts found yet. Run tasks first, then refresh.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden lg:block lg:sticky lg:top-4">
+              {selectedFile ? (
+                <FileViewer
+                  projectName={projectName}
+                  file={selectedFile}
+                  onClose={() => setSelectedFile(null)}
+                />
+              ) : (
+                <div className="rounded-lg border border-dashed border-border bg-card/60 px-4 py-6 text-center text-xs text-muted-foreground">
+                  Select <code className="bg-muted px-1 rounded">research_brief.json</code>, <code className="bg-muted px-1 rounded">tasks.json</code>,
+                  or any artifact file to preview it here.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {selectedFile && (
+            <div className="lg:hidden mt-4">
               <FileViewer
                 projectName={projectName}
                 file={selectedFile}
                 onClose={() => setSelectedFile(null)}
               />
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </ScrollArea>
     </div>
   );

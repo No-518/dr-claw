@@ -107,8 +107,26 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ filePath, content }),
     }),
-  getFiles: (projectName, options = {}) =>
-    authenticatedFetch(`/api/projects/${projectName}/files`, options),
+  getFiles: (projectName, options = {}) => {
+    const { path, maxDepth, showHidden, ...fetchOptions } = options || {};
+    const params = new URLSearchParams();
+
+    if (typeof path === 'string' && path) {
+      params.append('path', path);
+    }
+    if (maxDepth !== undefined && maxDepth !== null) {
+      params.append('maxDepth', String(maxDepth));
+    }
+    if (showHidden !== undefined && showHidden !== null) {
+      params.append('showHidden', String(showHidden));
+    }
+
+    const query = params.toString();
+    return authenticatedFetch(
+      `/api/projects/${projectName}/files${query ? `?${query}` : ''}`,
+      fetchOptions
+    );
+  },
   transcribe: (formData) =>
     authenticatedFetch('/api/transcribe', {
       method: 'POST',
@@ -118,6 +136,9 @@ export const api = {
 
   // TaskMaster endpoints
   taskmaster: {
+    detect: (projectName) =>
+      authenticatedFetch(`/api/taskmaster/detect/${encodeURIComponent(projectName)}`),
+
     // Initialize TaskMaster in a project
     init: (projectName) =>
       authenticatedFetch(`/api/taskmaster/init/${projectName}`, {
@@ -200,6 +221,23 @@ export const api = {
         method: 'POST',
       }),
   },
+
+  // Global skills endpoints
+  getGlobalSkills: () => authenticatedFetch('/api/skills'),
+  readGlobalSkillFile: (filePath) =>
+    authenticatedFetch(`/api/skills/file?filePath=${encodeURIComponent(filePath)}`),
+  validateSkillZip: (projectName, formData) =>
+    authenticatedFetch(`/api/skills/${projectName}/validate-skill-zip`, {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Let browser set multipart boundary
+    }),
+  uploadSkill: (projectName, formData) =>
+    authenticatedFetch(`/api/skills/${projectName}/upload-skill`, {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Let browser set multipart boundary
+    }),
 
   // Generic GET method for any endpoint
   get: (endpoint) => authenticatedFetch(`/api${endpoint}`),

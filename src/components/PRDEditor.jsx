@@ -447,7 +447,7 @@ This document outlines the requirements for building an AI-powered task manageme
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const downloadFileName = fileName ? `${fileName}.txt` : 'prd.txt';
+    const downloadFileName = fileName || 'research_brief.json';
     a.download = downloadFileName;
     document.body.appendChild(a);
     a.click();
@@ -782,7 +782,7 @@ This document outlines the requirements for building an AI-powered task manageme
                     <div className="bg-white dark:bg-gray-800 rounded border border-purple-200 dark:border-purple-700 p-3 mb-3">
                       <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">💬 Example:</p>
                       <p className="text-xs text-gray-900 dark:text-white font-mono">
-                        "I've just initialized a new project with Claude Task Master. I have a PRD at .taskmaster/docs/{fileName.endsWith('.txt') || fileName.endsWith('.md') ? fileName : `${fileName}.txt`}. Can you help me parse it and set up the initial tasks?"
+                        "I've just initialized a new project with Claude Task Master. I have a PRD at .pipeline/docs/{fileName.endsWith('.txt') || fileName.endsWith('.md') ? fileName : `${fileName}.txt`}. Can you help me parse it and set up the initial tasks?"
                       </p>
                     </div>
                     

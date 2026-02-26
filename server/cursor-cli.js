@@ -3,6 +3,7 @@ import crossSpawn from 'cross-spawn';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
+import { resolveCursorCliCommand } from './utils/cursorCommand.js';
 
 // Use cross-spawn on Windows for better command execution
 const spawnFunction = process.platform === 'win32' ? crossSpawn : spawn;
@@ -52,12 +53,24 @@ async function spawnCursor(command, options = {}, ws) {
     
     // Use cwd (actual project directory) instead of projectPath
     const workingDir = cwd || projectPath || process.cwd();
+    const cursorCommand = resolveCursorCliCommand();
+
+    if (!cursorCommand) {
+      const errorMessage = 'Cursor CLI not found. Install Cursor CLI or set CURSOR_CLI_PATH to `agent` or `cursor-agent`.';
+      ws.send({
+        type: 'cursor-error',
+        error: errorMessage,
+        sessionId: capturedSessionId || sessionId || null
+      });
+      reject(new Error(errorMessage));
+      return;
+    }
     
-    console.log('Spawning Cursor CLI:', 'cursor-agent', args.join(' '));
+    console.log('Spawning Cursor CLI:', cursorCommand, args.join(' '));
     console.log('Working directory:', workingDir);
     console.log('Session info - Input sessionId:', sessionId, 'Resume:', resume);
     
-    const cursorProcess = spawnFunction('cursor-agent', args, {
+    const cursorProcess = spawnFunction(cursorCommand, args, {
       cwd: workingDir,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env } // Inherit all environment variables

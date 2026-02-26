@@ -1,26 +1,27 @@
 {
-  "name": "@siteboon/claude-code-ui",
-  "version": "1.18.0",
-  "description": "A web-based UI for Claude Code CLI",
+  "name": "vibelab",
+  "version": "0.1.0",
+  "description": "Vibe Lab — Desktop and mobile UI for Claude Code, Cursor CLI and Codex with Research Lab",
   "type": "module",
   "main": "server/index.js",
   "bin": {
-    "claude-code-ui": "server/cli.js",
-    "cloudcli": "server/cli.js"
+    "vibelab": "server/cli.js"
   },
   "files": [
     "server/",
     "shared/",
     "dist/",
-    "README.md"
+    "README.md",
+    "NOTICE",
+    "LICENSE"
   ],
-  "homepage": "https://cloudcli.ai",
+  "homepage": "https://github.com/OpenLAIR/VibeLab",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/siteboon/claudecodeui.git"
+    "url": "git+https://github.com/OpenLAIR/VibeLab.git"
   },
   "bugs": {
-    "url": "https://github.com/siteboon/claudecodeui/issues"
+    "url": "https://github.com/OpenLAIR/VibeLab/issues"
   },
   "scripts": {
     "dev": "concurrently --kill-others \"LATEXLAB_ENABLED=true npm run server\" \"vite --host --port 5173\" \"npm run latexlab:dev:embedded\"",
@@ -31,6 +32,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "npm run build && npm run server",
     "release": "./release.sh",
+    "prepublishOnly": "npm run build",
+    "postinstall": "node scripts/fix-node-pty.js",
     "dev:vibelab": "concurrently --kill-others \"npm run server\" \"vite --host --port 5173\"",
     "latexlab:install": "npm install --prefix apps/latexlab/apps/backend && npm install --prefix apps/latexlab/apps/frontend",
     "latexlab:dev": "npm run latexlab:dev:backend",
@@ -54,6 +57,9 @@
   ],
   "author": "Vibe Lab Contributors",
   "license": "GPL-3.0",
+  "engines": {
+    "node": "20.x || 22.x || 24.x"
+  },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.71",
     "@codemirror/lang-css": "^6.3.1",
@@ -66,7 +72,8 @@
     "@codemirror/theme-one-dark": "^6.1.2",
     "@iarna/toml": "^2.2.5",
     "@octokit/rest": "^22.0.0",
-    "@openai/codex-sdk": "^0.75.0",
+    "@openai/codex": "^0.104.0",
+    "@openai/codex-sdk": "^0.101.0",
     "@replit/codemirror-minimap": "^0.5.2",
     "@tailwindcss/typography": "^0.5.16",
     "@uiw/react-codemirror": "^4.23.13",
@@ -75,6 +82,7 @@
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/addon-webgl": "^0.18.0",
     "@xterm/xterm": "^5.5.0",
+    "adm-zip": "^0.5.16",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.2.0",
     "chokidar": "^4.0.3",
@@ -112,6 +120,7 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^22.19.7",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",

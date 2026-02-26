@@ -194,13 +194,29 @@ export const TaskMasterProvider = ({ children }) => {
       
       const data = await response.json();
       
-      setTasks(data.tasks || []);
-      
-      // Find next task (pending or in-progress)
-      const nextTask = data.tasks?.find(task => 
-        task.status === 'pending' || task.status === 'in-progress'
+      const loadedTasks = data.tasks || [];
+      setTasks(loadedTasks);
+
+      let resolvedNextTask = loadedTasks.find(task =>
+        task.status === 'in-progress' || task.status === 'pending'
       ) || null;
-      setNextTask(nextTask);
+
+      try {
+        const guidanceResponse = await api.get(`/taskmaster/next-guidance/${encodeURIComponent(currentProject.name)}`);
+        if (guidanceResponse.ok) {
+          const guidanceData = await guidanceResponse.json();
+          if (guidanceData?.nextTask) {
+            resolvedNextTask = {
+              ...guidanceData.nextTask,
+              guidance: guidanceData.guidance || null,
+            };
+          }
+        }
+      } catch (guidanceError) {
+        console.warn('Failed to load next guidance, falling back to local task ordering:', guidanceError);
+      }
+
+      setNextTask(resolvedNextTask);
       
       
     } catch (err) {

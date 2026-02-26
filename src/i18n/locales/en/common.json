@@ -24,16 +24,22 @@
     "git": "Source Control",
     "tasks": "Tasks",
     "researchLab": "Research Lab",
+    "skills": "Skills",
     "latexEditing": "Latex Editing"
   },
   "researchLabGuide": {
-    "title": "How to use VibeLab correctly",
-    "description": "Please follow the Usage Guide workflow before running research tasks in this project.",
-    "step1": "Create or open a project",
-    "step2": "In Chat, choose a CLI backend (Claude Code / Cursor / Codex) and start the conversation",
-    "step3": "Describe your research goal and let the orchestrator run the pipeline",
-    "step4": "Use Research Lab to review idea, artifacts, and paper outputs",
-    "readmeHint": "Use the process in README.md -> Usage Guide."
+    "title": "How to Use VibeLab",
+    "description": "Start in Chat to describe your research idea. The agent will generate your pipeline and tasks through conversation. Then review and execute tasks here.",
+    "step1": "Go to Chat and describe your research topic, goal, or paper idea. The agent will ask clarifying questions.",
+    "step2": "The agent generates .pipeline/docs/research_brief.json and .pipeline/tasks/tasks.json based on your conversation.",
+    "step3": "Review your tasks here in Research Lab. Click Go to Chat on any task to execute it with the agent.",
+    "step4": "Track progress across Ideation, Experiment, and Publication stages. Refine the brief and tasks as you go.",
+    "interfaceMap": "Interface: Task list and progress on the left, file preview on the right. Click Go to Chat on any task to execute it.",
+    "readmeHint": "For full process details, see README.md -> Usage Guide.",
+    "briefEditingTitle": "Research Brief Editing Guidance",
+    "briefEditingStep1": "Fill core constraints first (goal, boundaries, metrics). Incomplete inputs are acceptable for initial task generation.",
+    "briefEditingStep2": "Click Apply Template + Generate Tasks to update .pipeline/docs/research_brief.json and regenerate .pipeline/tasks/tasks.json.",
+    "briefEditingStep3": "Use Use in Chat from the Pipeline Task List below in sequence, and keep writing clarified conclusions back to research_brief."
   },
   "status": {
     "loading": "Loading...",
@@ -195,6 +201,9 @@
       "creating": "Creating...",
       "cloning": "Cloning..."
     },
+    "folderBrowser": {
+      "regenerateName": "Generate new name"
+    },
     "errors": {
       "selectType": "Please select whether you have an existing workspace or want to create a new one",
       "providePath": "Please provide a workspace path",
@@ -211,6 +220,7 @@
     "viewFullRelease": "View full release",
     "updateProgress": "Update Progress:",
     "manualUpgrade": "Manual upgrade:",
+    "npmUpgradeCommand": "npm install -g vibelab@latest",
     "manualUpgradeHint": "Or click \"Update Now\" to run the update automatically.",
     "updateCompleted": "Update completed successfully!",
     "restartServer": "Please restart the server to apply changes.",

@@ -12,8 +12,8 @@ Constructs the prompt for the ML Agent to refine its implementation based on Jud
 | `plan_res`       | string | Detailed implementation plan |
 | `ml_dev_res`     | string | The ML Agent's last implementation result |
 | `judge_res`      | string | The Judge Agent's feedback / suggestions |
-| `core_code_path` | string | Path to `Experiment/core_code/` |
-| `code_references_path` | string | Path to `Experiment/code_references/` |
+| `core_code` | string | Path to `Experiment/core_code/` — absolute from `instance.Experiment.core_code` when created by Vibe Lab; use as-is or resolve if relative |
+| `code_references` | string | Path to `Experiment/code_references/` — absolute from `instance.Experiment.code_references` when created by Vibe Lab; use as-is or resolve if relative |
 
 ## Template
 

@@ -10,9 +10,9 @@ Constructs the prompt for the ML Agent to implement the project code.
 | `prepare_res`         | string | JSON with reference codebases and paths |
 | `code_survey_res`     | string | Comprehensive code survey / model survey notes |
 | `plan_res`            | string | Detailed implementation plan from the Coding Plan Agent |
-| `dataset_description` | string | Description of available datasets |
-| `core_code_path`      | string | Path to `Experiment/core_code/` |
-| `code_references_path`| string | Path to `Experiment/code_references/` |
+| `dataset_description` | string | Description of available datasets (from prepare step) |
+| `core_code`          | string | Path to `Experiment/core_code/` — absolute from `instance.Experiment.core_code` when created by Vibe Lab; use as-is or resolve if relative |
+| `code_references`    | string | Path to `Experiment/code_references/` — absolute from `instance.Experiment.code_references` when created by Vibe Lab; use as-is or resolve if relative |
 
 ## Template (abbreviated — full template is extensive)
 

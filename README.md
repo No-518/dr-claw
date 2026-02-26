@@ -1,73 +1,65 @@
 <div align="center">
-  <img src="public/logo.svg" alt="Vibe Lab" width="64" height="64">
-  <h1>Vibe Lab</h1>
+  <img src="public/favicon.png" alt="VibeLab" width="96" height="96">
+  <h1>VibeLab: A General-Purpose AI Research Assistant from Idea to Paper</h1>
+  <p><strong>Plan, run, and write research in one workspace.</strong></p>
 </div>
 
-A desktop and mobile UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor CLI](https://docs.cursor.com/en/cli/overview) and [Codex](https://developers.openai.com/codex), with an integrated **Research Lab** for AI-driven research automation. You can use it locally or remotely to view your active projects and sessions, manage research pipelines, and make changes from everywhere (mobile or desktop).
+<p align="center">
+<a href="https://github.com/OpenLAIR/VibeLab">
+<img src="https://img.shields.io/github/stars/OpenLAIR/VibeLab?style=for-the-badge&logo=github" alt="GitHub Stars" />
+</a>
+<a href="https://github.com/OpenLAIR/VibeLab/blob/main/LICENSE">
+<img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge" alt="License" />
+</a>
+<a href="https://join.slack.com/t/vibe-lab-group/shared_invite/zt-3r4bkcx5t-iGyRMI~r09zt7p_ND2eP9A">
+<img src="https://img.shields.io/badge/Join-Slack-4A154B?style=for-the-badge&logo=slack" alt="Join Slack" />
+</a>
+<a href="https://x.com/Vibe2038004">
+<img src="https://img.shields.io/badge/Follow-on%20X-black?style=for-the-badge&logo=x" alt="Follow on X" />
+</a>
+</p>
 
- [English](./README.md) | [中文](./README.zh-CN.md)
+<p align="center">
+  <a href="./README.md">English</a> | <a href="./README.zh-CN.md">中文</a>
+</p>
 
-## Screenshots
+## Overview
 
-<div align="center">
+VibeLab is a general-purpose AI research assistant designed to help researchers and builders execute end-to-end projects across different domains. From shaping an initial idea to running experiments and preparing publication-ready outputs, VibeLab keeps the full workflow in one place so teams can focus on research quality and iteration speed.
 
-<table>
-<tr>
-<td align="center">
-<h3>Desktop View</h3>
-<img src="public/screenshots/desktop-main.png" alt="Desktop Interface" width="400">
-<br>
-<em>Main interface showing project overview and chat</em>
-</td>
-<td align="center">
-<h3>Mobile Experience</h3>
-<img src="public/screenshots/mobile-chat.png" alt="Mobile Interface" width="250">
-<br>
-<em>Responsive mobile design with touch navigation</em>
-</td>
-</tr>
-<tr>
-<td align="center" colspan="2">
-<h3>CLI Selection</h3>
-<img src="public/screenshots/cli-selection.png" alt="CLI Selection" width="400">
-<br>
-<em>Select between Claude Code, Cursor CLI and Codex</em>
-</td>
-</tr>
-</table>
+## Highlights
 
+- **🔬 Research Lab** — Structured dashboard for end-to-end research: define your brief, generate a pipeline of tasks, track progress across Ideation → Experiment → Publication, and inspect source papers, ideas (rendered with LaTeX math), and cache artifacts — all at a glance
+- **📚 100+ Research Skills** — A curated library spanning idea generation, code survey, experiment development & analysis, paper writing, review response, and delivery — automatically discovered by agents and applied as task-level assistance
+- **🗂️ Chat-Driven Pipeline** — Describe your research idea in Chat; the agent uses the `inno-pipeline-planner` skill to interactively generate a structured research brief and task list — no manual templates needed
+- **🤖 Multi-Agent Backend** — Seamlessly switch between Claude Code, Cursor CLI, and Codex as your execution engine; compatible with Claude Sonnet 4.5, Opus 4.5, and GPT-5.2
 
+<details>
+<summary><span style="font-size: 1.17em; font-weight: 600;">More Features</span></summary>
 
-</div>
+- **💬 Interactive Chat + Shell** — Chat with your agent or drop into a full terminal — side by side with your research context
+- **📁 File & Git Explorer** — Browse files with syntax highlighting, live-edit, stage changes, commit, and switch branches without leaving the UI
+- **📱 Responsive & PWA-Ready** — Desktop, tablet, and mobile layouts with bottom tab bar, swipe gestures, and Add-to-Home-Screen support
+- **🔄 Session Management** — Resume conversations, manage multiple sessions, and track full history across projects
 
-## Features
-
-- **Research Lab** - Structured dashboard for AI-driven research: view overview, source papers, generated ideas (rendered as Markdown with LaTeX math), pipeline status, and cache artifacts at a glance
-- **InnoFlow Skills** - Built-in modular research pipeline skills (orchestrator, resource preparation, idea generation, code survey, experiment development, experiment analysis, paper writing) that guide agents step-by-step
-- **Responsive Design** - Works seamlessly across desktop, tablet, and mobile so you can also use Claude Code, Cursor, or Codex from mobile
-- **Interactive Chat Interface** - Built-in chat interface for seamless communication with Claude Code, Cursor, or Codex
-- **Integrated Shell Terminal** - Direct access to Claude Code, Cursor CLI, or Codex through built-in shell functionality
-- **File Explorer** - Interactive file tree with syntax highlighting and live editing
-- **Git Explorer** - View, stage and commit your changes. You can also switch branches
-- **Session Management** - Resume conversations, manage multiple sessions, and track history
-- **Model Compatibility** - Works with Claude Sonnet 4.5, Opus 4.5, and GPT-5.2
+</details>
 
 
 ## Quick Start
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v20 or higher
+- [Node.js](https://nodejs.org/) v20 or higher (**v22 LTS recommended**, see `.nvmrc`)
 - At least one of the following CLI tools installed and configured:
   - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
-  - [Cursor CLI](https://docs.cursor.com/en/cli/overview)
-  - [Codex](https://developers.openai.com/codex)
+  - [Cursor CLI](https://cursor.com/cli)
+  - [Codex](https://developers.openai.com/codex/cli/)
 
 ### Installation
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/bbsngg/VibeLab.git
+git clone https://github.com/OpenLAIR/VibeLab.git
 cd VibeLab
 ```
 
@@ -82,178 +74,146 @@ cp .env.example .env
 # Edit .env with your preferred settings (port, etc.)
 ```
 
-4. **Start the application:**
+4. **Check runtime network lock (important for web search):**
+```bash
+echo "${CODEX_SANDBOX_NETWORK_DISABLED:-0}"
+```
+
+If the output is `1`, network requests can remain blocked even if Settings permissions are opened.
+Remove or override this variable in your deployment/startup layer (shell profile, systemd, Docker, PM2), then restart VibeLab.
+
+5. **Start the application:**
 ```bash
 # Development mode (with hot reload)
 npm run dev
 ```
 
-5. **Open your browser** at `http://localhost:3001` (or the port you configured in `.env`)
+6. **Open your browser** at `http://localhost:5173` (or the port you configured in `.env`)
 
 ## Research Lab — Quick Example
 
-The core feature of Vibe Lab is the **Research Lab**: an AI-driven research pipeline that takes a research topic and automatically generates ideas, writes experiment code, runs experiments, and analyzes results.
+The core feature of VibeLab is the **Research Lab**.
 
-Here is how a typical research session looks:
+### Step 0 — Configure Any One Agent in Settings First
 
-### 1. Describe your research task
+Before generating a pipeline, open **Settings** (gear icon) and configure at least one agent:
 
-Open a project in Vibe Lab, switch to the **Chat** tab, and type something like:
+- **Claude Code**: complete CLI login and verify the tool is available. If you need web search, allow `WebSearch` and `WebFetch` in Permissions.
+- **Cursor CLI**: complete CLI login and verify the tool is available. If you need web search, allow network-capable shell commands (for example `Shell(curl)`, `Shell(wget)`, `Shell(python)`).
+- **Codex**: complete CLI login and choose a suitable permission mode.
 
-```
-Task: Train a neural network model for biomedical question answering using the
-BioASQ factoid QA dataset. The task is to develop a model that can accurately
-answer biomedical questions given supporting document contexts. The model should
-leverage neural architectures to improve over traditional IR-based methods, with
-a focus on handling domain-specific biomedical terminology and concepts.
+You only need **one** agent configured to continue. For webpage search, you can use Claude, Cursor, or Codex as long as network-related permissions are enabled for the selected agent.
 
-Related papers:
-- Making neural QA as simple as possible but not simpler
-- Global vectors for word representation
-- Continuous space word vectors obtained by applying word2vec to abstracts of biomedical articles
-- Bidirectional attention flow for machine comprehension
-- Learning to answer biomedical questions: OAQA at BioASQ 4B
-```
+### Step 1 — Open Chat and Describe Your Research Idea
 
-The **orchestrator** skill automatically classifies this as an *idea-level* task, constructs the necessary metadata, and begins the pipeline.
+VibeLab opens **Chat** by default. If no research pipeline exists, an onboarding banner guides you to get started. Click **Use in Chat** to inject a template prompt, or simply describe your research idea in your own words.
 
-### 2. The pipeline runs step-by-step
+### Step 2 — Agent Generates Your Pipeline
 
-```
-Orchestrator          →  Judges input maturity, sets up workspace
-  ↓
-Prepare Resources     →  Searches GitHub, clones reference repos, downloads papers
-  ↓
-Idea Generation       →  Generates 5 diverse ideas, selects & refines the best one
-  ↓
-Code Survey           →  Acquires extra repos, surveys codebases for reusable components
-  ↓
-Experiment Dev        →  Creates implementation plan, writes full project code,
-                         iterates with a Judge agent, submits experiment (3–10 epochs)
-  ↓
-Experiment Analysis   →  Analyzes results, draws charts, suggests improvements,
-                         implements refinements, runs further experiments
-  ↓
-Paper Writing         →  Writes paper in LaTeX using conference templates,
-                         manages citations, and formats the final PDF
-```
+The agent runs the `inno-pipeline-planner` skill, asking you a few rounds of questions to understand your topic, scope, and goals. Once enough context is gathered, it generates `.pipeline/docs/research_brief.json` and `.pipeline/tasks/tasks.json` automatically.
 
-Each step produces cache artifacts (JSON logs) that you can inspect in the **Research Lab** dashboard.
+### Step 3 — Review Tasks and Execute
 
-### 3. Review results in the dashboard
+Switch to **Research Lab** to review the generated task list and research brief. Click **Go to Chat** or **Use in Chat** on any task to send it to the agent for execution.
 
-Switch to the **Research Lab** tab to see:
-
-- **Research Overview** — your task, chosen idea, pipeline mode
-- **Generated Ideas** — rendered as rich Markdown with LaTeX math formulas
-- **Pipeline Artifacts** — grouped by stage, with built-in viewer/editor
-- **Experiment Results** — training logs, metrics, analysis reports, charts
-- **Paper** — when the paper writing skill has run, view or open **main.pdf** (in `Publication/paper/`) directly in the dashboard
-
-All data lives in `instance.json`, `pipeline_config.json`, `Ideation/`, `Experiment/`, and `Publication/` inside the project directory.
-
-> **Tip**: You can also provide a *full implementation plan* instead of a topic. The orchestrator will detect it as *plan-level* and skip idea generation, jumping straight to code survey and experiment development.
-
-## Security & Tools Configuration
-
-**🔒 Important Notice**: All Claude Code tools are **disabled by default**. This prevents potentially harmful operations from running automatically.
-
-### Enabling Tools
-
-To use Claude Code's full functionality, you'll need to manually enable tools:
-
-1. **Open Tools Settings** - Click the gear icon in the sidebar
-3. **Enable Selectively** - Turn on only the tools you need
-4. **Apply Settings** - Your preferences are saved locally
-
-<div align="center">
-
-![Tools Settings Modal](public/screenshots/tools-modal.png)
-*Tools Settings interface - enable only what you need*
-
-</div>
-
-**Recommended approach**: Start with basic tools enabled and add more as needed. You can always adjust these settings later.
+For full step-by-step operations, see **Usage Guide** below.
 
 ## Usage Guide
 
-After starting Vibe Lab, open your browser and follow the steps below.
+After starting VibeLab, open your browser and follow the steps below.
 
 ### Step 1 — Create or Open a Project
 
-When you first open Vibe Lab you will see the **Projects** sidebar. You have two options:
+When you first open VibeLab you will see the **Projects** sidebar. You have two options:
 
-- **Open an existing project** — Vibe Lab auto-discovers projects from Claude Code, Cursor, and Codex sessions. Click any listed project to open it.
-- **Create a new project** — Click the **"+"** button, choose a directory on your machine, and Vibe Lab will set up the workspace for you.
+- **Open an existing project** — VibeLab auto-discovers projects from Claude Code, Cursor, and Codex sessions. Click any listed project to open it.
+- **Create a new project** — Click the **"+"** button, choose a directory on your machine, and VibeLab will set up the workspace: `.claude/`, `.agents/`, `.cursor/` (with `skills/` symlinked from the app), preset dirs (`Ideation/ideas`, `Ideation/references`, `Experiment/code_references`, `Experiment/datasets`, `Experiment/core_code`, `Experiment/analysis`, `Publication/paper`, `Publication/homepage`, `Publication/slide`), and **instance.json** at the project root with absolute paths for those directories.
 
-### Step 2 — Choose Your CLI
+### Step 2 — Generate Your Research Pipeline via Chat
 
-In the project view, click the **CLI selector** (top of the sidebar) to pick which agent backend to use:
+After creating or opening a project, VibeLab opens **Chat** by default. If no research pipeline exists yet, an onboarding banner appears with a **Use in Chat** button that injects a starter prompt.
 
-| Backend | When to use |
-|---------|-------------|
-| **Claude Code** | General-purpose coding agent by Anthropic |
-| **Cursor CLI** | Cursor IDE's built-in agent |
-| **Codex** | OpenAI's Codex agent |
+Describe your research idea — even a rough one is fine. The agent uses the `inno-pipeline-planner` skill to ask clarifying questions and then generates:
+- `.pipeline/docs/research_brief.json` (your structured research brief)
+- `.pipeline/tasks/tasks.json` (the task pipeline)
 
-You can switch between backends at any time without losing project context.
+### Step 3 — Review in Research Lab and Execute Tasks
 
-### Step 3 — Start Working
+Switch to **Research Lab** to review the generated tasks, progress metrics, and artifacts. Then execute tasks:
+1. Choose a CLI backend from the **CLI selector** (Claude Code / Cursor CLI / Codex).
+2. In **Research Lab**, click **Go to Chat** or **Use in Chat** on a pending task.
+3. The agent executes the task and writes results back to the project.
 
-You have several ways to interact with your project:
+### Step 4 — Enable Network Access for Web Search (Claude / Cursor / Codex)
+
+If the agent cannot search webpages, your current permission settings are likely too restrictive. If web search still fails after you open permissions, ensure you have checked the **runtime network lock** in **Quick Start** (step 4) — if `CODEX_SANDBOX_NETWORK_DISABLED` is `1`, Settings alone cannot fix it.
+
+1. Open **Settings** (gear icon in sidebar).
+2. Go to **Permissions**, then choose your current agent:
+- **Claude Code**:
+  - Enable `WebSearch` and `WebFetch` in **Allowed Tools**.
+  - Ensure they are not present in **Blocked Tools**.
+  - Optionally enable **Skip permission prompts** if you want fewer confirmations.
+- **Cursor CLI**:
+  - Add required commands to **Allowed Shell Commands** (for example `Shell(curl)`, `Shell(wget)`, `Shell(python)`, `Shell(node)`).
+  - Ensure they are not present in **Blocked Shell Commands**.
+  - Optionally enable **Skip permission prompts** if you want fewer confirmations.
+- **Codex**:
+  - In **Permission Mode**, switch to **Bypass Permissions** when web access is required.
+3. Return to **Chat**, start a new message, and retry your web-search prompt.
+
+Codex mode differences:
+- **Default / Accept Edits**: sandboxed execution; network may still be restricted by session policy.
+- **Bypass Permissions**: `sandboxMode=danger-full-access` with full disk and network access.
+
+Security note:
+- Use permissive settings only in trusted projects/environments.
+- After finishing web search tasks, switch back to safer settings.
+
+### Step 5 — Resolve "Workspace Trust" or First-Run Errors
+
+Each agent may require a one-time trust confirmation before it can execute code in your project directory. If Chat freezes or shows a trust prompt, switch to the **Shell** tab inside VibeLab and approve the prompt there.
+
+Steps:
+1. Switch to the **Shell** tab in VibeLab.
+2. Approve the trust/auth prompt shown in Shell.
+3. Return to **Chat** and resend your message.
+
+By default, trust flow is already enabled in VibeLab, so you usually do **not** need to manually run extra trust commands.
+
+The trust decision is persisted per directory — you only need to do this once per project.
+
+> **Shell tab not working?** If the Shell tab shows `Error: posix_spawnp failed`, see [docs/faq.md](docs/faq.md) for the fix, then retry.
+
+You can switch tabs at any time:
 
 | Tab | What it does |
 |-----|-------------|
-| **Chat** | Send prompts to the selected CLI agent. Supports streaming responses, session resume, message history, code blocks, and file references. |
+| **Chat** | **Default first screen.** Describe your research idea to generate the pipeline, or execute tasks with the selected agent. Supports streaming responses, session resume, and message history. |
+| **Research Lab** | Review research brief, task progress, and artifacts. Tasks and briefs are generated via Chat. |
 | **Shell** | Drop directly into the CLI terminal for full command-line control. |
 | **Files** | Browse the project file tree, view and edit files with syntax highlighting, create/rename/delete files. |
 | **Git** | View diffs, stage changes, commit, and switch branches — all from the UI. |
-| **Research Lab** | *(See below)* Structured dashboard for AI-driven research pipelines. |
 
-### Step 4 (Optional) — Use the Research Lab
+#### Research Skills
 
-The **Research Lab** tab is designed for structured, multi-step AI research. It provides:
+VibeLab now uses the generated **Pipeline Task List** as the execution flow.
+The project includes **100+ skills** under `skills/` to support research tasks (idea exploration, code survey, experiment development/analysis, writing, review, and delivery).
+These skills are discovered by the agent and can be applied as task-level assistance throughout the workflow.
 
-- **Research Overview** — Target paper, task description, instance ID, category, pipeline mode (Plan vs. Idea)
-- **Source Papers** — All referenced papers with type badges
-- **Final Selected Idea** — Rich Markdown rendering with LaTeX math (KaTeX), GFM tables, code blocks. Copy-to-clipboard and collapsible view
-- **Pipeline Configuration** — Instance path, task level, category, dataset
-- **Research Artifacts** — Log files grouped by pipeline stage with expand/collapse navigation and built-in viewer/editor
-- **Paper (main.pdf)** — If the paper writing skill has produced a draft, the compiled **main.pdf** is shown in an embedded viewer; you can open it in a new tab for full-screen reading
+<details>
+<summary><span style="font-size: 1.17em; font-weight: 600;">Mobile & Tablet</span></summary>
 
-Data is loaded from `instance.json`, `pipeline_config.json`, `Ideation/`, `Experiment/`, and `Publication/` within the project.
-
-#### InnoFlow Research Pipeline
-
-Vibe Lab ships with modular research skills under `skills/`. When a project is created, they are symlinked into `<project>/.claude/skills/` so the agent can discover and follow them automatically.
-
-**Pipeline overview** (Idea mode):
-
-```
-Orchestrator → Prepare Resources → Idea Generation → Code Survey → Experiment Dev → Experiment Analysis → Paper Writing
-```
-
-| Skill | Purpose |
-|-------|---------|
-| **inno-research-orchestrator** | Entry point: judges input maturity (plan vs. idea), constructs instance JSON, sets up workspace |
-| **inno-prepare-resources** | GitHub search, clone reference repos, download arXiv papers |
-| **inno-idea-generation** | Generates N diverse ideas, selects and refines the best one |
-| **inno-code-survey** | Phase A: acquire extra repos for the chosen idea; Phase B: comprehensive code survey |
-| **inno-experiment-dev** | Creates implementation plan, writes project code with judge feedback loop, submits experiment |
-| **inno-experiment-analysis** | Analyzes results, draws charts, gives code suggestions, implements refinements |
-| **inno-paper-writing** | Write publication-ready ML/AI papers with LaTeX templates, citation verification, and conference checklists (NeurIPS, ICML, ICLR, ACL, AAAI, COLM) |
-
-To start a research run, open the **Chat** tab and describe your research task (e.g. *"I want to research biomedical question answering"*). The orchestrator skill will guide the agent through the full pipeline.
-
-### Mobile & Tablet
-
-Vibe Lab is fully responsive. On mobile devices:
+VibeLab is fully responsive. On mobile devices:
 
 - **Bottom tab bar** for thumb-friendly navigation
 - **Swipe gestures** and touch-optimized controls
 - **Add to Home Screen** to use it as a PWA (Progressive Web App)
 
-## Architecture
+</details>
+
+<details>
+<summary><span style="font-size: 1.17em; font-weight: 600;">Architecture</span></summary>
 
 ### System Overview
 
@@ -275,11 +235,27 @@ Vibe Lab is fully responsive. On mobile devices:
 - **React 18** - Modern component architecture with hooks
 - **CodeMirror** - Advanced code editor with syntax highlighting
 
+</details>
 
+<details>
+<summary><span style="font-size: 1.17em; font-weight: 600;">Security & Tools Configuration</span></summary>
 
+**🔒 Important Notice**: All Claude Code tools are **disabled by default**. This prevents potentially harmful operations from running automatically.
 
+### Enabling Tools
 
-### Contributing
+To use Claude Code's full functionality, you'll need to manually enable tools:
+
+1. **Open Tools Settings** - Click the gear icon in the sidebar
+3. **Enable Selectively** - Turn on only the tools you need
+4. **Apply Settings** - Your preferences are saved locally
+
+**Recommended approach**: Start with basic tools enabled and add more as needed. You can always adjust these settings later.
+
+</details>
+
+<details>
+<summary><span style="font-size: 1.17em; font-weight: 600;">Contributing</span></summary>
 
 We welcome contributions! Please follow these guidelines:
 
@@ -307,26 +283,9 @@ We welcome contributions! Please follow these guidelines:
 - **UI/UX improvements** - Better user experience
 - **Performance optimizations** - Make it faster
 
-## Troubleshooting
+</details>
 
-### Common Issues & Solutions
-
-
-#### "No Claude projects found"
-**Problem**: The UI shows no projects or empty project list
-**Solutions**:
-- Ensure [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is properly installed
-- Run `claude` command in at least one project directory to initialize
-- Verify `~/.claude/projects/` directory exists and has proper permissions
-
-#### File Explorer Issues
-**Problem**: Files not loading, permission errors, empty directories
-**Solutions**:
-- Check project directory permissions (`ls -la` in terminal)
-- Verify the project path exists and is accessible
-- Review server console logs for detailed error messages
-- Ensure you're not trying to access system directories outside project scope
-
+For setup help and troubleshooting, see [FAQ](docs/faq.md).
 
 ## License
 
@@ -345,6 +304,10 @@ This project is open source and free to use, modify, and distribute under the GP
 - **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
 - **[CodeMirror](https://codemirror.net/)** - Advanced code editor
 
+### Also Thanks To
+- **[Claude Code UI](https://github.com/siteboon/claudecodeui)** — VibeLab is based on it. See [NOTICE](NOTICE) for details.
+- **[AI Researcher](https://github.com/HKUDS/AI-Researcher/)** (HKUDS) — Inspiration for research workflow and agentic research.
+
 ## Support & Community
 
 ### Stay Updated
@@ -352,10 +315,8 @@ This project is open source and free to use, modify, and distribute under the GP
 - **Watch** for updates and new releases
 - **Follow** the project for announcements
 
-### Sponsors
-- [Siteboon - AI powered website builder](https://siteboon.ai)
 ---
 
 <div align="center">
-  <strong>Vibe Lab — Made with care for the Claude Code, Cursor and Codex community.</strong>
+  <strong>VibeLab — From idea to paper.</strong>
 </div>

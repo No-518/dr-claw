@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { resolveCursorCliCommand } from '../utils/cursorCommand.js';
 
 const router = express.Router();
 
@@ -107,6 +108,16 @@ async function checkClaudeCredentials() {
 function checkCursorStatus() {
   return new Promise((resolve) => {
     let processCompleted = false;
+    const cursorCommand = resolveCursorCliCommand();
+
+    if (!cursorCommand) {
+      resolve({
+        authenticated: false,
+        email: null,
+        error: 'Cursor CLI not found. Install Cursor CLI or set CURSOR_CLI_PATH to `agent` or `cursor-agent`.'
+      });
+      return;
+    }
 
     const timeout = setTimeout(() => {
       if (!processCompleted) {
@@ -123,18 +134,7 @@ function checkCursorStatus() {
     }, 5000);
 
     let childProcess;
-    try {
-      childProcess = spawn('cursor-agent', ['status']);
-    } catch (err) {
-      clearTimeout(timeout);
-      processCompleted = true;
-      resolve({
-        authenticated: false,
-        email: null,
-        error: 'Cursor CLI not found or not installed'
-      });
-      return;
-    }
+    childProcess = spawn(cursorCommand, ['status']);
 
     let stdout = '';
     let stderr = '';
@@ -191,7 +191,7 @@ function checkCursorStatus() {
       resolve({
         authenticated: false,
         email: null,
-        error: 'Cursor CLI not found or not installed'
+        error: `${cursorCommand} is not available`
       });
     });
   });

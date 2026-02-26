@@ -7,9 +7,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import CredentialsSettings from './CredentialsSettings';
 import GitSettings from './GitSettings';
-import TasksSettings from './TasksSettings';
 import LoginModal from './LoginModal';
 import { authenticatedFetch } from '../utils/api';
+import { isTelemetryEnabled, setTelemetryEnabled } from '../utils/telemetry';
 
 // New settings components
 import AgentListItem from './settings/AgentListItem';
@@ -17,6 +17,8 @@ import AccountContent from './settings/AccountContent';
 import PermissionsContent from './settings/PermissionsContent';
 import McpServersContent from './settings/McpServersContent';
 import LanguageSelector from './LanguageSelector';
+
+const VALID_SETTINGS_TABS = new Set(['agents', 'appearance', 'git', 'api']);
 
 function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   const { isDarkMode, toggleDarkMode } = useTheme();
@@ -28,7 +30,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   const [skipPermissions, setSkipPermissions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
-  const [projectSortOrder, setProjectSortOrder] = useState('name');
+  const [projectSortOrder, setProjectSortOrder] = useState('date');
 
   const [mcpServers, setMcpServers] = useState([]);
   const [showMcpForm, setShowMcpForm] = useState(false);
@@ -53,7 +55,9 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   const [mcpTestResults, setMcpTestResults] = useState({});
   const [mcpServerTools, setMcpServerTools] = useState({});
   const [mcpToolsLoading, setMcpToolsLoading] = useState({});
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(
+    VALID_SETTINGS_TABS.has(initialTab) ? initialTab : 'agents',
+  );
   const [jsonValidationError, setJsonValidationError] = useState('');
   const [selectedAgent, setSelectedAgent] = useState('claude'); // 'claude', 'cursor', or 'codex'
   const [selectedCategory, setSelectedCategory] = useState('account'); // 'account', 'permissions', or 'mcp'
@@ -74,6 +78,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   const [codeEditorFontSize, setCodeEditorFontSize] = useState(() =>
     localStorage.getItem('codeEditorFontSize') || '14'
   );
+  const [telemetryEnabled, setTelemetryEnabledState] = useState(() => isTelemetryEnabled());
   
   // Cursor-specific states
   const [cursorAllowedCommands, setCursorAllowedCommands] = useState([]);
@@ -497,7 +502,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
       checkClaudeAuthStatus();
       checkCursorAuthStatus();
       checkCodexAuthStatus();
-      setActiveTab(initialTab);
+      setActiveTab(VALID_SETTINGS_TABS.has(initialTab) ? initialTab : 'agents');
     }
   }, [isOpen, initialTab]);
 
@@ -527,6 +532,10 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
     window.dispatchEvent(new Event('codeEditorSettingsChanged'));
   }, [codeEditorFontSize]);
 
+  useEffect(() => {
+    setTelemetryEnabled(telemetryEnabled);
+  }, [telemetryEnabled]);
+
   const loadSettings = async () => {
     try {
       
@@ -538,7 +547,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         setAllowedTools(settings.allowedTools || []);
         setDisallowedTools(settings.disallowedTools || []);
         setSkipPermissions(settings.skipPermissions || false);
-        setProjectSortOrder(settings.projectSortOrder || 'name');
+        setProjectSortOrder(settings.projectSortOrder || 'date');
       } else {
         // Set defaults
         setAllowedTools([]);
@@ -1006,16 +1015,6 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                 <Key className="w-4 h-4 inline mr-2" />
                 {t('mainTabs.apiTokens')}
               </button>
-              <button
-                onClick={() => setActiveTab('tasks')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'tasks'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {t('mainTabs.tasks')}
-              </button>
             </div>
           </div>
 
@@ -1058,6 +1057,49 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
               )}
             </span>
           </button>
+        </div>
+      </div>
+    </div>
+
+    {/* Telemetry Settings */}
+    <div className="space-y-4">
+      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium text-foreground">
+              {t('appearanceSettings.telemetry.label')}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {t('appearanceSettings.telemetry.description')}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span
+              className={`text-xs font-semibold px-2 py-1 rounded-md ${
+                telemetryEnabled
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                  : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {telemetryEnabled ? 'ON' : 'OFF'}
+            </span>
+            <button
+              onClick={() => setTelemetryEnabledState(!telemetryEnabled)}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+                telemetryEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'
+              }`}
+              role="switch"
+              aria-checked={telemetryEnabled}
+              aria-label={t('appearanceSettings.telemetry.label')}
+            >
+              <span className="sr-only">{t('appearanceSettings.telemetry.label')}</span>
+              <span
+                className={`${
+                  telemetryEnabled ? 'translate-x-7' : 'translate-x-1'
+                } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200`}
+              />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1890,13 +1932,6 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                     </div>
                   </form>
                 </div>
-              </div>
-            )}
-
-            {/* Tasks Tab */}
-            {activeTab === 'tasks' && (
-              <div className="space-y-6 md:space-y-8">
-                <TasksSettings />
               </div>
             )}
 

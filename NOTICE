@@ -1,0 +1,15 @@
+Vibe Lab
+Copyright (C) Vibe Lab Contributors
+
+This project is based on software from the following upstream project,
+used under the GNU General Public License v3.0 (GPL-3.0):
+
+  Claude Code UI (claudecodeui)
+  https://github.com/siteboon/claudecodeui
+
+  Modifications and the Research Lab, InnoFlow Skills, and related features
+  are Copyright (C) Vibe Lab Contributors. This distribution is licensed
+  under the same GPL-3.0. See the file LICENSE in this distribution.
+
+  You should have received a copy of the GNU General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.

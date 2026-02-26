@@ -111,7 +111,7 @@ export function useProjectsState({
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedSession, setSelectedSession] = useState<ProjectSession | null>(null);
-  const [activeTab, setActiveTab] = useState<AppTab>('researchlab');
+  const [activeTab, setActiveTab] = useState<AppTab>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress | null>(null);
@@ -121,6 +121,8 @@ export function useProjectsState({
   const [externalMessageUpdate, setExternalMessageUpdate] = useState(0);
 
   const loadingProgressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const projectsUpdateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingProjectsMessageRef = useRef<ProjectsUpdatedMessage | null>(null);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -187,68 +189,82 @@ export function useProjectsState({
       return;
     }
 
-    const projectsMessage = latestMessage as ProjectsUpdatedMessage;
+    pendingProjectsMessageRef.current = latestMessage as ProjectsUpdatedMessage;
 
-    if (projectsMessage.changedFile && selectedSession && selectedProject) {
-      const normalized = projectsMessage.changedFile.replace(/\\/g, '/');
-      const changedFileParts = normalized.split('/');
+    if (projectsUpdateDebounceRef.current) {
+      return;
+    }
 
-      if (changedFileParts.length >= 2) {
-        const filename = changedFileParts[changedFileParts.length - 1];
-        const changedSessionId = filename.replace('.jsonl', '');
+    projectsUpdateDebounceRef.current = setTimeout(() => {
+      projectsUpdateDebounceRef.current = null;
+      const projectsMessage = pendingProjectsMessageRef.current;
+      pendingProjectsMessageRef.current = null;
 
-        if (changedSessionId === selectedSession.id) {
-          const isSessionActive = activeSessions.has(selectedSession.id);
+      if (!projectsMessage) {
+        return;
+      }
 
-          if (!isSessionActive) {
-            setExternalMessageUpdate((prev) => prev + 1);
+      if (projectsMessage.changedFile && selectedSession && selectedProject) {
+        const normalized = projectsMessage.changedFile.replace(/\\/g, '/');
+        const changedFileParts = normalized.split('/');
+
+        if (changedFileParts.length >= 2) {
+          const filename = changedFileParts[changedFileParts.length - 1];
+          const changedSessionId = filename.replace('.jsonl', '');
+
+          if (changedSessionId === selectedSession.id) {
+            const isSessionActive = activeSessions.has(selectedSession.id);
+
+            if (!isSessionActive) {
+              setExternalMessageUpdate((prev) => prev + 1);
+            }
           }
         }
       }
-    }
 
-    const hasActiveSession =
-      (selectedSession && activeSessions.has(selectedSession.id)) ||
-      (activeSessions.size > 0 && Array.from(activeSessions).some((id) => id.startsWith('new-session-')));
+      const hasActiveSession =
+        (selectedSession && activeSessions.has(selectedSession.id)) ||
+        (activeSessions.size > 0 && Array.from(activeSessions).some((id) => id.startsWith('new-session-')));
 
-    const updatedProjects = projectsMessage.projects;
+      const updatedProjects = projectsMessage.projects;
 
-    if (
-      hasActiveSession &&
-      !isUpdateAdditive(projects, updatedProjects, selectedProject, selectedSession)
-    ) {
-      return;
-    }
+      if (
+        hasActiveSession &&
+        !isUpdateAdditive(projects, updatedProjects, selectedProject, selectedSession)
+      ) {
+        return;
+      }
 
-    setProjects(updatedProjects);
+      setProjects(updatedProjects);
 
-    if (!selectedProject) {
-      return;
-    }
+      if (!selectedProject) {
+        return;
+      }
 
-    const updatedSelectedProject = updatedProjects.find(
-      (project) => project.name === selectedProject.name,
-    );
+      const updatedSelectedProject = updatedProjects.find(
+        (project) => project.name === selectedProject.name,
+      );
 
-    if (!updatedSelectedProject) {
-      return;
-    }
+      if (!updatedSelectedProject) {
+        return;
+      }
 
-    if (serialize(updatedSelectedProject) !== serialize(selectedProject)) {
-      setSelectedProject(updatedSelectedProject);
-    }
+      if (serialize(updatedSelectedProject) !== serialize(selectedProject)) {
+        setSelectedProject(updatedSelectedProject);
+      }
 
-    if (!selectedSession) {
-      return;
-    }
+      if (!selectedSession) {
+        return;
+      }
 
-    const updatedSelectedSession = getProjectSessions(updatedSelectedProject).find(
-      (session) => session.id === selectedSession.id,
-    );
+      const updatedSelectedSession = getProjectSessions(updatedSelectedProject).find(
+        (session) => session.id === selectedSession.id,
+      );
 
-    if (!updatedSelectedSession) {
-      setSelectedSession(null);
-    }
+      if (!updatedSelectedSession) {
+        setSelectedSession(null);
+      }
+    }, 250);
   }, [latestMessage, selectedProject, selectedSession, activeSessions, projects]);
 
   useEffect(() => {
@@ -257,6 +273,11 @@ export function useProjectsState({
         clearTimeout(loadingProgressTimeoutRef.current);
         loadingProgressTimeoutRef.current = null;
       }
+      if (projectsUpdateDebounceRef.current) {
+        clearTimeout(projectsUpdateDebounceRef.current);
+        projectsUpdateDebounceRef.current = null;
+      }
+      pendingProjectsMessageRef.current = null;
     };
   }, []);
 

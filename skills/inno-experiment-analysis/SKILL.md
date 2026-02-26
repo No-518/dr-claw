@@ -1,120 +1,337 @@
 ---
 name: inno-experiment-analysis
-description: Analyzes experimental results, draws charts, gives code suggestions, implements refinements, and runs further experiments. Use after inno-experiment-dev.
+description: This skill should be used when the user asks to "analyze experimental results", "generate results section", "statistical analysis of experiments", "compare model performance", "create results visualization", or mentions connecting experimental data to paper writing. Provides comprehensive guidance for analyzing ML/AI experimental results and generating paper-ready content.
+tags: [Research, Analysis, Statistics, Visualization, Paper Writing]
+version: 0.1.0
 ---
 
-# Inno Experiment Analysis (Analysis and Refinement)
+# Results Analysis for ML/AI Research
 
-Takes the refinement loop from the former `inno-experiment-submit-refine`. Mirrors the analysis and refinement portions of `_submit_and_refine_experiments` (945-977) in `run_infer_idea_ours.py`.
+A systematic experimental results analysis workflow connecting experimental data to paper writing.
 
-## Inputs
+## Core Features
 
-| Variable | Source | Description |
-|----------|--------|-------------|
-| `survey_res` | inno-idea-generation or user | The finalized selected idea |
-| `updated_prepare_res` | inno-prepare-resources | JSON with reference codebases and paths |
-| `plan_res` | inno-experiment-dev Phase 1 | Detailed implementation plan |
-| `submit_res` | inno-experiment-dev Phase 3 | Submission result with statistical outputs |
-| `judge_messages` | inno-experiment-dev | Full conversation thread to continue |
-| `core_code_path` | pipeline config | Path to `Experiment/core_code/` |
-| `analysis_path` | pipeline config | Path to `Experiment/analysis/` |
-| `code_references_path` | pipeline config | Path to `Experiment/code_references/` |
-| `exp_iter_times` | pipeline config | Number of analysis-refinement iterations (default from `DEFAULT_EXP_ITER_TIMES`) |
-| `context_variables` | shared state | Mutable dict carrying state across agents |
+This skill provides three core capabilities:
 
-Plan mode additionally uses `ideas` and plan-specific prompt variants (`build_exp_planner_query_for_plan`).
+1. **Experimental Data Analysis** - Read and analyze experimental data in various formats
+2. **Statistical Validation** - Perform statistical significance tests and performance comparisons
+3. **Paper Content Generation** - Generate text and visualizations for the Results section
 
-## Outputs
+## When to Use
 
-| Variable | Description |
-|----------|-------------|
-| `experiment_report` | List of `{analysis_report, further_plan}` dicts (one per iteration) |
-| `refine_res` | Final refinement result from the ML Agent |
-| `context_variables` | Updated with `experiment_report` list |
+Use this skill when you need to:
+- Analyze experimental results (CSV, JSON, TensorBoard logs)
+- Generate the Results section of a paper
+- Compare performance across multiple models
+- Perform statistical significance tests
+- Create publication-quality visualizations
+- Validate the reliability of experimental results
 
-## Cache Artifacts
+## Workflow
 
-| File | Agent | Content |
-|------|-------|---------|
-| `Experiment/analysis/logs/experiment_analysis_agent_iter_refine_{N}.json` | Experiment Analysis Agent | Analysis messages with `experiment_report` in context_variables |
-| `Experiment/analysis/logs/machine_learning_agent_iter_refine_{N}.json` | ML Agent | Refinement implementation messages |
+### Standard Analysis Pipeline
 
-Where `{N}` is the iteration number (1, 2, ...).
+```
+Data Loading → Data Validation → Statistical Analysis → Visualization → Writing → Quality Check
+```
 
-## Instructions
+### Step 1: Data Loading and Validation
 
-### Analysis-Refinement Loop
+**Supported Data Formats:**
+- CSV files - Tabular data
+- JSON files - Structured results
+- TensorBoard logs - Training curves
+- Python pickle - Complex objects
 
-For each iteration i in 1..`exp_iter_times`:
+**Data Validation Checks:**
+- Completeness check - Missing values, outliers
+- Consistency check - Data format, units
+- Reproducibility check - Random seeds, version info
 
-1. **Analyze results**: Build `exp_planner_query = build_exp_planner_query(survey_res, prepare_res, plan_res, submit_res)` (see `prompts/build_exp_planner_query.md`). Plan mode uses `build_exp_planner_query_for_plan`.
+Select appropriate tools for data loading and preliminary validation based on data format.
 
-2. **Call Experiment Analysis Agent**: Append `exp_planner_query` to `judge_messages` as user message. Call the agent with `iter_times="refine_{i}"`.
-   - The agent reviews experiment outputs (logs, metrics, saved models, images)
-   - Reviews reference codebases and papers for comparison
-   - Creates visualizations (loss curves, metric comparisons, confusion matrices, etc.) saved to `Experiment/analysis/`
-   - Calls `case_resolved(analysis_report=..., further_plan=...)` which appends to `context_variables["experiment_report"]`
-   - See `references/exp_analyser_instructions.md` for agent details
+### Step 2: Statistical Analysis
 
-3. **Extract results**: Read `context_variables["experiment_report"][-1]` to get:
-   - `analysis_report`: detailed findings about the experiment
-   - `further_plan`: dict mapping experiment names to descriptions (e.g., `{"A1_fix_embedding": "Fix embedding dimension mismatch", "A2_add_scheduler": "Add learning rate scheduler"}`)
-   - If `experiment_report` is missing, the analysis agent failed to call `case_resolved` -- raise an error.
+**Basic Statistics:**
+- Mean
+- Standard Deviation
+- Standard Error
+- Confidence Interval
 
-4. **Build refine query**: `refine_query = build_refine_query(survey_res, prepare_res, plan_res, submit_res, analysis_report, core_code_path)` (see `prompts/build_refine_query.md`).
+**Significance Tests:**
+- t-test - Two-group comparison
+- ANOVA - Multi-group comparison
+- Wilcoxon test - Non-parametric test
+- Bonferroni correction - Multiple comparison correction
 
-5. **Call ML Agent for refinement**: Append `refine_query` to `judge_messages` as user message. Call **ML Agent** with `iter_times="refine_{i}"`.
-   - The agent modifies existing code in `Experiment/core_code/`
-   - Runs further experiments as specified in the further plan
-   - Ensures all training scripts save model checkpoints
-   - Calls `case_resolved` or `case_not_resolved`
-   - Update `refine_res = judge_messages[-1]["content"]`
-   - Update `submit_res = refine_res` for next iteration
+Select appropriate statistical tests based on data characteristics.
 
-6. Surface `experiment_report` and `refine_res` to the user/UI.
+**Key Principles:**
+- Report complete statistical information (mean ± std/SE)
+- Specify the test method and significance level used
+- Report p-values and effect sizes
+- Consider multiple comparison issues
 
-### Capabilities
+See `references/statistical-methods.md` for the complete statistical methods guide.
 
-The Experiment Analysis Agent can:
-- **Analyze results**: Review training logs, metrics, model outputs
-- **Draw charts**: Create loss curves, accuracy plots, confusion matrices, t-SNE visualizations, etc. using matplotlib/seaborn
-- **View images**: Use the `visualizer` tool to inspect generated images, plots, and visual results
-- **Read papers**: Navigate reference papers for comparison benchmarks
-- **Code suggestions**: Produce actionable `further_plan` items linking back to the original idea
+### Step 3: Model Performance Comparison
 
-The ML Agent (for refinements) can:
-- **Modify code**: Edit existing files in the project directory
-- **Add experiments**: Create new experiment scripts
-- **Run experiments**: Execute training/testing with full GPU support
-- **Debug**: Use the anti-deadloop system for persistent errors
+**Comparison Dimensions:**
+- Accuracy/Performance metrics
+- Training time/Inference speed
+- Model complexity/Parameter count
+- Robustness/Generalization ability
 
-## Tool Mappings
+**Comparison Methods:**
+- Baseline comparison - Compare with existing methods
+- Ablation study - Validate component contributions
+- Cross-dataset validation - Test generalization
 
-| Original Tool | Claude Code Equivalent |
-|---------------|----------------------|
-| `gen_code_tree_structure` | `tree -L 3 <path>` |
-| `read_file` | Read tool / `cat` |
-| `open_local_file` | Read tool (for markdown/text files) |
-| `page_up/down_markdown` | Read with offset/limit |
-| `find_on_page_ctrl_f` / `find_next` | Grep tool |
-| `question_answer_on_whole_page` | Agent reads and reasons about content |
-| `visualizer` | Agent describes image content |
-| `case_resolved(analysis_report, further_plan)` | Agent returns structured analysis |
-| ML Agent tools | Same mappings as in inno-experiment-dev |
+Systematically compare performance across different methods, ensuring fair comparison.
 
-## Checklist
+### Step 4: Visualization
 
-- [ ] `exp_planner_query` built with correct variant for Idea vs Plan mode.
-- [ ] Experiment Analysis Agent called; `experiment_report` populated in `context_variables`.
-- [ ] `analysis_report` and `further_plan` extracted from latest `experiment_report` entry.
-- [ ] `refine_query` built and ML Agent called for refinement.
-- [ ] Model checkpoints saved after each refinement training run.
-- [ ] Cache artifacts saved to `Experiment/analysis/logs/`: `experiment_analysis_agent_iter_refine_{N}.json`, `machine_learning_agent_iter_refine_{N}.json`.
-- [ ] Results surfaced to user/UI.
-- [ ] Loop repeats for `exp_iter_times` iterations.
+**Publication-Quality Visualization Requirements:**
+- Vector format (PDF/EPS)
+- Colorblind-friendly palette
+- Clear labels and legends
+- Appropriate error bars
+- Readable in black-and-white print
 
-## References
+**Common Chart Types:**
+- Line chart - Training curves, trend analysis
+- Bar chart - Performance comparison
+- Box plot - Distribution display
+- Heatmap - Correlation analysis
+- Scatter plot - Relationship display
 
-- `run_infer_idea_ours.py`: `_submit_and_refine_experiments` refinement loop (945-977)
-- `prompt_templates.py`: `build_exp_planner_query` (530-560), `build_refine_query` (563-598)
-- Agent definition: `exp_analyser.py` in `inno/agents/inno_agent/`
+Use appropriate visualization tools to generate publication-quality figures.
+
+See `references/visualization-best-practices.md` for the visualization guide.
+
+### Step 5: Writing the Results Section
+
+**Results Section Structure:**
+
+```markdown
+## Results
+
+### Overview of Main Findings
+[1-2 paragraphs summarizing core results]
+
+### Experimental Setup
+[Brief description of experimental configuration; details in appendix]
+
+### Performance Comparison
+[Comparison with baseline methods, including tables and figures]
+
+### Ablation Study
+[Validate contributions of each component]
+
+### Statistical Significance
+[Report statistical test results]
+
+### Qualitative Analysis
+[Case studies, visualization examples]
+```
+
+**Writing Principles:**
+- Clearly state the hypothesis each experiment validates
+- Guide readers to observe key phenomena: "Figure X shows..."
+- Report complete statistical information
+- Honestly report limitations
+
+See `references/results-writing-guide.md` for the complete writing guide.
+
+### Step 6: Quality Check
+
+**Checklist:**
+- [ ] All values include error bars/confidence intervals
+- [ ] Statistical test methods are specified
+- [ ] Figures are clear and readable (including black-and-white print)
+- [ ] Hyperparameter search ranges are reported
+- [ ] Computational resources are specified (GPU type, time)
+- [ ] Random seed settings are specified
+- [ ] Results are reproducible (code/data available)
+
+## Common Mistakes and Pitfalls
+
+### Statistical Errors
+
+❌ **Wrong approach:**
+- Reporting only the best results (cherry-picking)
+- Confusing standard deviation and standard error
+- Not reporting statistical significance
+- Not correcting for multiple comparisons
+
+✅ **Correct approach:**
+- Report all experimental results
+- Clearly specify whether standard deviation or standard error is used
+- Perform appropriate statistical tests
+- Use Bonferroni or similar correction methods
+
+### Visualization Errors
+
+❌ **Wrong approach:**
+- Using non-colorblind-friendly palettes
+- Y-axis not starting from 0 (exaggerating differences)
+- Missing error bars
+- Overly complex figures
+
+✅ **Correct approach:**
+- Use Okabe-Ito or Paul Tol palettes
+- Set reasonable axis ranges
+- Include error bars and confidence intervals
+- Keep figures clean and clear
+
+### Writing Errors
+
+❌ **Wrong approach:**
+- Over-interpreting results
+- Not describing experimental setup
+- Hiding negative results
+- Missing statistical information
+
+✅ **Correct approach:**
+- Objectively describe observed phenomena
+- Provide sufficient experimental details
+- Honestly report all results
+- Report complete statistical information
+
+See `references/common-pitfalls.md` for the complete error patterns and fixes.
+
+## Integration with Paper Writing
+
+### Collaboration with ml-paper-writing Skill
+
+This skill focuses on experimental results analysis and works in tandem with the `ml-paper-writing` skill:
+
+**inno-experiment-analysis handles:**
+- Data analysis and statistical tests
+- Visualization generation
+- Results interpretation
+
+**ml-paper-writing handles:**
+- Complete paper structure
+- Citation management
+- Conference format requirements
+
+**Workflow Integration:**
+```
+Experiments complete → inno-experiment-analysis analyzes
+    ↓
+Generate analysis report and visualizations
+    ↓
+ml-paper-writing integrates into paper
+    ↓
+Complete Results section
+```
+
+### Output Format
+
+After analysis, the following are generated:
+
+1. **Analysis Report** (`analysis-report.md`)
+   - Statistical summary
+   - Key findings
+   - Suggested figures
+
+2. **Visualization Files** (`figures/`)
+   - PDF format figures
+   - Standalone figure captions
+
+3. **Results Draft** (`results-draft.md`)
+   - Text ready for direct use in the paper
+   - Includes figure references
+
+## Examples and Templates
+
+### Example Files
+
+Refer to the `examples/` directory for complete examples:
+
+- **`example-analysis-report.md`** - Complete analysis report example
+- **`example-results-section.md`** - Paper Results section example
+
+### Workflow Overview
+
+The complete analysis pipeline includes:
+
+1. **Data Loading** - Read results from experiment output files
+2. **Statistical Analysis** - Compute basic statistics and perform significance tests
+3. **Visualization** - Create publication-quality figures
+4. **Report Generation** - Integrate analysis results and visualizations
+
+See the guides in the `references/` directory for detailed methods and best practices.
+
+## Reference Resources
+
+### Detailed Guides
+
+- **`references/statistical-methods.md`** - Complete statistical methods guide
+- **`references/results-writing-guide.md`** - Results section writing standards
+- **`references/visualization-best-practices.md`** - Visualization best practices
+- **`references/common-pitfalls.md`** - Common errors and fixes
+
+### External Resources
+
+- [Nature Statistics Checklist](https://www.nature.com/documents/nr-reporting-summary-flat.pdf)
+- [Science Reproducibility Guidelines](https://www.science.org/content/page/science-journals-editorial-policies)
+- [NeurIPS Paper Checklist](https://neurips.cc/Conferences/2025/PaperInformation/PaperChecklist)
+
+## Best Practices Summary
+
+### Data Analysis
+
+✅ **Recommended:**
+- Run experiments multiple times (at least 3-5 runs)
+- Report complete statistical information
+- Use appropriate statistical tests
+- Check data completeness
+
+❌ **Prohibited:**
+- Cherry-picking best results
+- Ignoring statistical significance
+- Hiding negative results
+- Not reporting experimental setup
+
+### Visualization
+
+✅ **Recommended:**
+- Use vector format
+- Colorblind-friendly palettes
+- Include error bars
+- Clear labels
+
+❌ **Prohibited:**
+- Raster formats (PNG/JPG)
+- Misleading axis scales
+- Overly complex figures
+- Missing legends
+
+### Writing
+
+✅ **Recommended:**
+- Objectively describe results
+- Provide sufficient detail
+- Honestly report limitations
+- Guide reader attention
+
+❌ **Prohibited:**
+- Over-interpretation
+- Hiding details
+- Exaggerating effects
+- Vague descriptions
+
+## Summary
+
+This skill provides a systematic experimental results analysis workflow:
+
+1. **Data Loading and Validation** - Ensure data quality
+2. **Statistical Analysis** - Perform appropriate statistical tests
+3. **Model Comparison** - Systematic performance comparison
+4. **Visualization** - Publication-quality figures
+5. **Writing** - Results section content
+6. **Quality Check** - Ensure reproducibility
+
+Following these principles produces high-quality, reproducible experimental results analysis that meets top conference standards.

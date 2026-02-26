@@ -1,57 +1,57 @@
 /**
  * PROJECT DISCOVERY AND MANAGEMENT SYSTEM
  * ========================================
- * 
+ *
  * This module manages project discovery for both Claude CLI and Cursor CLI sessions.
- * 
+ *
  * ## Architecture Overview
- * 
+ *
  * 1. **Claude Projects** (stored in ~/.claude/projects/)
  *    - Each project is a directory named with the project path encoded (/ replaced with -)
  *    - Contains .jsonl files with conversation history including 'cwd' field
  *    - Project metadata stored in ~/.claude/project-config.json
- * 
+ *
  * 2. **Cursor Projects** (stored in ~/.cursor/chats/)
  *    - Each project directory is named with MD5 hash of the absolute project path
  *    - Example: /Users/john/myproject -> MD5 -> a1b2c3d4e5f6...
  *    - Contains session directories with SQLite databases (store.db)
  *    - Project path is NOT stored in the database - only in the MD5 hash
- * 
+ *
  * ## Project Discovery Strategy
- * 
+ *
  * 1. **Claude Projects Discovery**:
  *    - Scan ~/.claude/projects/ directory for Claude project folders
  *    - Extract actual project path from .jsonl files (cwd field)
  *    - Fall back to decoded directory name if no sessions exist
- * 
+ *
  * 2. **Cursor Sessions Discovery**:
  *    - For each KNOWN project (from Claude or manually added)
  *    - Compute MD5 hash of the project's absolute path
  *    - Check if ~/.cursor/chats/{md5_hash}/ directory exists
  *    - Read session metadata from SQLite store.db files
- * 
+ *
  * 3. **Manual Project Addition**:
  *    - Users can manually add project paths via UI
  *    - Stored in ~/.claude/project-config.json with 'manuallyAdded' flag
  *    - Allows discovering Cursor sessions for projects without Claude sessions
- * 
+ *
  * ## Critical Limitations
- * 
+ *
  * - **CANNOT discover Cursor-only projects**: From a quick check, there was no mention of
  *   the cwd of each project. if someone has the time, you can try to reverse engineer it.
- * 
+ *
  * - **Project relocation breaks history**: If a project directory is moved or renamed,
  *   the MD5 hash changes, making old Cursor sessions inaccessible unless the old
  *   path is known and manually added.
- * 
+ *
  * ## Error Handling
- * 
+ *
  * - Missing ~/.claude directory is handled gracefully with automatic creation
  * - ENOENT errors are caught and handled without crashing
  * - Empty arrays returned when no projects/sessions exist
- * 
+ *
  * ## Caching Strategy
- * 
+ *
  * - Project directory extraction is cached to minimize file I/O
  * - Cache is cleared when project configuration changes
  * - Session data is fetched on-demand, not cached
@@ -60,31 +60,59 @@
 import { promises as fs } from 'fs';
 import fsSync from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import readline from 'readline';
 import crypto from 'crypto';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import os from 'os';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const VIBELAB_SKILLS_DIR = path.join(__dirname, '..', 'skills');
+const PROJECT_SKILL_FOLDERS = ['.claude', '.agents', '.cursor'];
+const PROJECT_PIPELINE_FOLDERS = ['Ideation', 'Experiment', 'Publication', 'Research'];
+
+function normalizeTaskStatus(status) {
+    const raw = String(status || '').trim().toLowerCase();
+    if (!raw) return 'pending';
+    if (raw === 'completed' || raw === 'complete') return 'done';
+    if (raw === 'in_progress' || raw === 'inprogress') return 'in-progress';
+    if (raw === 'todo' || raw === 'open') return 'pending';
+    return raw;
+}
+
 // Import TaskMaster detection functions
 async function detectTaskMasterFolder(projectPath) {
     try {
-        const taskMasterPath = path.join(projectPath, '.taskmaster');
-        
-        // Check if .taskmaster directory exists
+        const pipelinePath = path.join(projectPath, '.pipeline');
+        const legacyPath = path.join(projectPath, '.taskmaster');
+        let taskMasterPath = pipelinePath;
+
+        const hasPipeline = await fs.access(pipelinePath).then(() => true).catch(() => false);
+        if (!hasPipeline) {
+            const hasLegacy = await fs.access(legacyPath).then(() => true).catch(() => false);
+            if (hasLegacy) {
+                await fs.cp(legacyPath, pipelinePath, { recursive: true, force: false });
+                taskMasterPath = pipelinePath;
+            } else {
+                taskMasterPath = pipelinePath;
+            }
+        }
+
+        // Check if .pipeline directory exists
         try {
             const stats = await fs.stat(taskMasterPath);
             if (!stats.isDirectory()) {
                 return {
                     hasTaskmaster: false,
-                    reason: '.taskmaster exists but is not a directory'
+                    reason: '.pipeline exists but is not a directory'
                 };
             }
         } catch (error) {
             if (error.code === 'ENOENT') {
                 return {
                     hasTaskmaster: false,
-                    reason: '.taskmaster directory not found'
+                    reason: '.pipeline directory not found'
                 };
             }
             throw error;
@@ -95,7 +123,7 @@ async function detectTaskMasterFolder(projectPath) {
             'tasks/tasks.json',
             'config.json'
         ];
-        
+
         const fileStatus = {};
         let hasEssentialFiles = true;
 
@@ -119,7 +147,7 @@ async function detectTaskMasterFolder(projectPath) {
                 const tasksPath = path.join(taskMasterPath, 'tasks/tasks.json');
                 const tasksContent = await fs.readFile(tasksPath, 'utf8');
                 const tasksData = JSON.parse(tasksContent);
-                
+
                 // Handle both tagged and legacy formats
                 let tasks = [];
                 if (tasksData.tasks) {
@@ -136,25 +164,27 @@ async function detectTaskMasterFolder(projectPath) {
 
                 // Calculate task statistics
                 const stats = tasks.reduce((acc, task) => {
+                    const taskStatus = normalizeTaskStatus(task.status);
                     acc.total++;
-                    acc[task.status] = (acc[task.status] || 0) + 1;
-                    
+                    acc[taskStatus] = (acc[taskStatus] || 0) + 1;
+
                     // Count subtasks
                     if (task.subtasks) {
                         task.subtasks.forEach(subtask => {
+                            const subtaskStatus = normalizeTaskStatus(subtask.status);
                             acc.subtotalTasks++;
                             acc.subtasks = acc.subtasks || {};
-                            acc.subtasks[subtask.status] = (acc.subtasks[subtask.status] || 0) + 1;
+                            acc.subtasks[subtaskStatus] = (acc.subtasks[subtaskStatus] || 0) + 1;
                         });
                     }
-                    
+
                     return acc;
-                }, { 
-                    total: 0, 
+                }, {
+                    total: 0,
                     subtotalTasks: 0,
-                    pending: 0, 
-                    'in-progress': 0, 
-                    done: 0, 
+                    pending: 0,
+                    'in-progress': 0,
+                    done: 0,
                     review: 0,
                     deferred: 0,
                     cancelled: 0,
@@ -218,7 +248,7 @@ async function loadProjectConfig() {
 async function saveProjectConfig(config) {
   const claudeDir = path.join(os.homedir(), '.claude');
   const configPath = path.join(claudeDir, 'project-config.json');
-  
+
   // Ensure the .claude directory exists
   try {
     await fs.mkdir(claudeDir, { recursive: true });
@@ -227,7 +257,7 @@ async function saveProjectConfig(config) {
       throw error;
     }
   }
-  
+
   await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
 }
 
@@ -235,13 +265,13 @@ async function saveProjectConfig(config) {
 async function generateDisplayName(projectName, actualProjectDir = null) {
   // Use actual project directory if provided, otherwise decode from project name
   let projectPath = actualProjectDir || projectName.replace(/-/g, '/');
-  
+
   // Try to read package.json from the project path
   try {
     const packageJsonPath = path.join(projectPath, 'package.json');
     const packageData = await fs.readFile(packageJsonPath, 'utf8');
     const packageJson = JSON.parse(packageData);
-    
+
     // Return the name from package.json if it exists
     if (packageJson.name) {
       return packageJson.name;
@@ -249,14 +279,14 @@ async function generateDisplayName(projectName, actualProjectDir = null) {
   } catch (error) {
     // Fall back to path-based naming if package.json doesn't exist or can't be read
   }
-  
+
   // If it starts with /, it's an absolute path
   if (projectPath.startsWith('/')) {
     const parts = projectPath.split('/').filter(Boolean);
     // Return only the last folder name
     return parts[parts.length - 1] || projectPath;
   }
-  
+
   return projectPath;
 }
 
@@ -281,14 +311,14 @@ async function extractProjectDirectory(projectName) {
   let latestTimestamp = 0;
   let latestCwd = null;
   let extractedPath;
-  
+
   try {
     // Check if the project directory exists
     await fs.access(projectDir);
-    
+
     const files = await fs.readdir(projectDir);
     const jsonlFiles = files.filter(file => file.endsWith('.jsonl'));
-    
+
     if (jsonlFiles.length === 0) {
       // Fall back to decoded project name if no sessions
       extractedPath = projectName.replace(/-/g, '/');
@@ -301,16 +331,16 @@ async function extractProjectDirectory(projectName) {
           input: fileStream,
           crlfDelay: Infinity
         });
-        
+
         for await (const line of rl) {
           if (line.trim()) {
             try {
               const entry = JSON.parse(line);
-              
+
               if (entry.cwd) {
                 // Count occurrences of each cwd
                 cwdCounts.set(entry.cwd, (cwdCounts.get(entry.cwd) || 0) + 1);
-                
+
                 // Track the most recent cwd
                 const timestamp = new Date(entry.timestamp || 0).getTime();
                 if (timestamp > latestTimestamp) {
@@ -324,7 +354,7 @@ async function extractProjectDirectory(projectName) {
           }
         }
       }
-      
+
       // Determine the best cwd to use
       if (cwdCounts.size === 0) {
         // No cwd found, fall back to decoded project name
@@ -336,7 +366,7 @@ async function extractProjectDirectory(projectName) {
         // Multiple cwd values - prefer the most recent one if it has reasonable usage
         const mostRecentCount = cwdCounts.get(latestCwd) || 0;
         const maxCount = Math.max(...cwdCounts.values());
-        
+
         // Use most recent if it has at least 25% of the max count
         if (mostRecentCount >= maxCount * 0.25) {
           extractedPath = latestCwd;
@@ -349,19 +379,19 @@ async function extractProjectDirectory(projectName) {
             }
           }
         }
-        
+
         // Fallback (shouldn't reach here)
         if (!extractedPath) {
           extractedPath = latestCwd || projectName.replace(/-/g, '/');
         }
       }
     }
-    
+
     // Cache the result
     projectDirectoryCache.set(projectName, extractedPath);
-    
+
     return extractedPath;
-    
+
   } catch (error) {
     // If the directory doesn't exist, just use the decoded project name
     if (error.code === 'ENOENT') {
@@ -371,10 +401,10 @@ async function extractProjectDirectory(projectName) {
       // Fall back to decoded project name for other errors
       extractedPath = projectName.replace(/-/g, '/');
     }
-    
+
     // Cache the fallback result too
     projectDirectoryCache.set(projectName, extractedPath);
-    
+
     return extractedPath;
   }
 }
@@ -422,25 +452,32 @@ async function getProjects(progressCallback = null) {
 
         // Extract actual project directory from JSONL sessions
         const actualProjectDir = await extractProjectDirectory(entry.name);
-        
+
         // Get display name from config or generate one
         const customName = config[entry.name]?.displayName;
         const autoDisplayName = await generateDisplayName(entry.name, actualProjectDir);
         const fullPath = actualProjectDir;
-        
+
+        let dirCreatedAt = null;
+        try {
+          const dirStat = await fs.stat(actualProjectDir);
+          dirCreatedAt = dirStat.birthtime.toISOString();
+        } catch (_) {}
+
         const project = {
           name: entry.name,
           path: actualProjectDir,
           displayName: customName || autoDisplayName,
           fullPath: fullPath,
           isCustomName: !!customName,
+          createdAt: dirCreatedAt,
           sessions: [],
           sessionMeta: {
             hasMore: false,
             total: 0
           }
         };
-        
+
         // Try to get sessions for this project (just first 5 for performance)
         try {
           const sessionResult = await getSessions(entry.name, 5, 0);
@@ -456,7 +493,7 @@ async function getProjects(progressCallback = null) {
             total: 0
           };
         }
-        
+
         // Also fetch Cursor sessions for this project
         try {
           project.cursorSessions = await getCursorSessions(actualProjectDir);
@@ -484,6 +521,7 @@ async function getProjects(progressCallback = null) {
             metadata: taskMasterResult.metadata,
             status: taskMasterResult.hasTaskmaster && taskMasterResult.hasEssentialFiles ? 'configured' : 'not-configured'
           };
+          project.pipeline = project.taskmaster;
         } catch (e) {
           console.warn(`Could not detect TaskMaster for project ${entry.name}:`, e.message);
           project.taskmaster = {
@@ -492,6 +530,7 @@ async function getProjects(progressCallback = null) {
             metadata: null,
             status: 'error'
           };
+          project.pipeline = project.taskmaster;
         }
 
       projects.push(project);
@@ -506,7 +545,7 @@ async function getProjects(progressCallback = null) {
       .filter(([name, cfg]) => cfg.manuallyAdded)
       .length;
   }
-  
+
   // Add manually configured projects that don't exist as folders yet
   for (const [projectName, projectConfig] of Object.entries(config)) {
     if (!existingProjects.has(projectName) && projectConfig.manuallyAdded) {
@@ -524,7 +563,7 @@ async function getProjects(progressCallback = null) {
 
       // Use the original path if available, otherwise extract from potential sessions
       let actualProjectDir = projectConfig.originalPath;
-      
+
       if (!actualProjectDir) {
         try {
           actualProjectDir = await extractProjectDirectory(projectName);
@@ -533,7 +572,13 @@ async function getProjects(progressCallback = null) {
           actualProjectDir = projectName.replace(/-/g, '/');
         }
       }
-      
+
+      let dirCreatedAt = null;
+      try {
+        const dirStat = await fs.stat(actualProjectDir);
+        dirCreatedAt = dirStat.birthtime.toISOString();
+      } catch (_) {}
+
       const project = {
           name: projectName,
           path: actualProjectDir,
@@ -541,6 +586,7 @@ async function getProjects(progressCallback = null) {
           fullPath: actualProjectDir,
           isCustomName: !!projectConfig.displayName,
           isManuallyAdded: true,
+          createdAt: dirCreatedAt,
           sessions: [],
           sessionMeta: {
             hasMore: false,
@@ -569,19 +615,20 @@ async function getProjects(progressCallback = null) {
       // Add TaskMaster detection for manual projects
       try {
         const taskMasterResult = await detectTaskMasterFolder(actualProjectDir);
-        
+
         // Determine TaskMaster status
         let taskMasterStatus = 'not-configured';
         if (taskMasterResult.hasTaskmaster && taskMasterResult.hasEssentialFiles) {
           taskMasterStatus = 'taskmaster-only'; // We don't check MCP for manual projects in bulk
         }
-        
+
         project.taskmaster = {
           status: taskMasterStatus,
           hasTaskmaster: taskMasterResult.hasTaskmaster,
           hasEssentialFiles: taskMasterResult.hasEssentialFiles,
           metadata: taskMasterResult.metadata
         };
+        project.pipeline = project.taskmaster;
       } catch (error) {
         console.warn(`TaskMaster detection failed for manual project ${projectName}:`, error.message);
         project.taskmaster = {
@@ -590,8 +637,9 @@ async function getProjects(progressCallback = null) {
           hasEssentialFiles: false,
           error: error.message
         };
+        project.pipeline = project.taskmaster;
       }
-      
+
       projects.push(project);
     }
   }
@@ -616,11 +664,11 @@ async function getSessions(projectName, limit = 5, offset = 0) {
     // agent-*.jsonl files contain session start data at this point. This needs to be revisited
     // periodically to make sure only accurate data is there and no new functionality is added there
     const jsonlFiles = files.filter(file => file.endsWith('.jsonl') && !file.startsWith('agent-'));
-    
+
     if (jsonlFiles.length === 0) {
       return { sessions: [], hasMore: false, total: 0 };
     }
-    
+
     // Sort files by modification time (newest first)
     const filesWithStats = await Promise.all(
       jsonlFiles.map(async (file) => {
@@ -630,37 +678,37 @@ async function getSessions(projectName, limit = 5, offset = 0) {
       })
     );
     filesWithStats.sort((a, b) => b.mtime - a.mtime);
-    
+
     const allSessions = new Map();
     const allEntries = [];
     const uuidToSessionMap = new Map();
-    
+
     // Collect all sessions and entries from all files
     for (const { file } of filesWithStats) {
       const jsonlFile = path.join(projectDir, file);
       const result = await parseJsonlSessions(jsonlFile);
-      
+
       result.sessions.forEach(session => {
         if (!allSessions.has(session.id)) {
           allSessions.set(session.id, session);
         }
       });
-      
+
       allEntries.push(...result.entries);
-      
+
       // Early exit optimization for large projects
       if (allSessions.size >= (limit + offset) * 2 && allEntries.length >= Math.min(3, filesWithStats.length)) {
         break;
       }
     }
-    
+
     // Build UUID-to-session mapping for timeline detection
     allEntries.forEach(entry => {
       if (entry.uuid && entry.sessionId) {
         uuidToSessionMap.set(entry.uuid, entry.sessionId);
       }
     });
-    
+
     // Group sessions by first user message ID
     const sessionGroups = new Map(); // firstUserMsgId -> { latestSession, allSessions[] }
     const sessionToFirstUserMsgId = new Map(); // sessionId -> firstUserMsgId
@@ -722,7 +770,7 @@ async function getSessions(projectName, limit = 5, offset = 0) {
     const total = visibleSessions.length;
     const paginatedSessions = visibleSessions.slice(offset, offset + limit);
     const hasMore = offset + limit < total;
-    
+
     return {
       sessions: paginatedSessions,
       hasMore,
@@ -889,22 +937,81 @@ async function parseJsonlSessions(filePath) {
   }
 }
 
+// Parse an agent JSONL file and extract tool uses/results for grouped rendering
+async function parseAgentTools(filePath) {
+  const tools = [];
+
+  try {
+    const fileStream = fsSync.createReadStream(filePath);
+    const rl = readline.createInterface({
+      input: fileStream,
+      crlfDelay: Infinity
+    });
+
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+
+      try {
+        const entry = JSON.parse(line);
+
+        if (entry.message?.role === 'assistant' && Array.isArray(entry.message?.content)) {
+          for (const part of entry.message.content) {
+            if (part.type === 'tool_use') {
+              tools.push({
+                toolId: part.id,
+                toolName: part.name,
+                toolInput: part.input,
+                timestamp: entry.timestamp
+              });
+            }
+          }
+        }
+
+        if (entry.message?.role === 'user' && Array.isArray(entry.message?.content)) {
+          for (const part of entry.message.content) {
+            if (part.type === 'tool_result') {
+              const tool = tools.find(t => t.toolId === part.tool_use_id);
+              if (tool) {
+                tool.toolResult = {
+                  content: typeof part.content === 'string'
+                    ? part.content
+                    : Array.isArray(part.content)
+                      ? part.content.map(c => c.text || '').join('\n')
+                      : JSON.stringify(part.content),
+                  isError: Boolean(part.is_error)
+                };
+              }
+            }
+          }
+        }
+      } catch (parseError) {
+        // Skip malformed lines
+      }
+    }
+  } catch (error) {
+    console.warn(`Error parsing agent file ${filePath}:`, error.message);
+  }
+
+  return tools;
+}
+
 // Get messages for a specific session with pagination support
 async function getSessionMessages(projectName, sessionId, limit = null, offset = 0) {
   const projectDir = path.join(os.homedir(), '.claude', 'projects', projectName);
 
   try {
     const files = await fs.readdir(projectDir);
-    // agent-*.jsonl files contain session start data at this point. This needs to be revisited
-    // periodically to make sure only accurate data is there and no new functionality is added there
+    // agent-*.jsonl files contain subagent tool history, handled separately below
     const jsonlFiles = files.filter(file => file.endsWith('.jsonl') && !file.startsWith('agent-'));
-    
+    const agentFiles = files.filter(file => file.endsWith('.jsonl') && file.startsWith('agent-'));
+
     if (jsonlFiles.length === 0) {
       return { messages: [], total: 0, hasMore: false };
     }
-    
+
     const messages = [];
-    
+    const agentToolsCache = new Map();
+
     // Process all JSONL files to find messages for this session
     for (const file of jsonlFiles) {
       const jsonlFile = path.join(projectDir, file);
@@ -913,7 +1020,7 @@ async function getSessionMessages(projectName, sessionId, limit = null, offset =
         input: fileStream,
         crlfDelay: Infinity
       });
-      
+
       for await (const line of rl) {
         if (line.trim()) {
           try {
@@ -927,26 +1034,52 @@ async function getSessionMessages(projectName, sessionId, limit = null, offset =
         }
       }
     }
-    
+
+    // Collect Task agent IDs and hydrate grouped subagent tool history
+    const agentIds = new Set();
+    for (const message of messages) {
+      if (message.toolUseResult?.agentId) {
+        agentIds.add(message.toolUseResult.agentId);
+      }
+    }
+
+    for (const agentId of agentIds) {
+      const agentFileName = `agent-${agentId}.jsonl`;
+      if (agentFiles.includes(agentFileName)) {
+        const agentFilePath = path.join(projectDir, agentFileName);
+        const tools = await parseAgentTools(agentFilePath);
+        agentToolsCache.set(agentId, tools);
+      }
+    }
+
+    for (const message of messages) {
+      if (message.toolUseResult?.agentId) {
+        const tools = agentToolsCache.get(message.toolUseResult.agentId);
+        if (tools && tools.length > 0) {
+          message.subagentTools = tools;
+        }
+      }
+    }
+
     // Sort messages by timestamp
-    const sortedMessages = messages.sort((a, b) => 
+    const sortedMessages = messages.sort((a, b) =>
       new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
     );
-    
+
     const total = sortedMessages.length;
-    
+
     // If no limit is specified, return all messages (backward compatibility)
     if (limit === null) {
       return sortedMessages;
     }
-    
+
     // Apply pagination - for recent messages, we need to slice from the end
     // offset 0 should give us the most recent messages
     const startIndex = Math.max(0, total - offset - limit);
     const endIndex = total - offset;
     const paginatedMessages = sortedMessages.slice(startIndex, endIndex);
     const hasMore = startIndex > 0;
-    
+
     return {
       messages: paginatedMessages,
       total,
@@ -963,17 +1096,24 @@ async function getSessionMessages(projectName, sessionId, limit = null, offset =
 // Rename a project's display name
 async function renameProject(projectName, newDisplayName) {
   const config = await loadProjectConfig();
-  
+
   if (!newDisplayName || newDisplayName.trim() === '') {
     // Remove custom name if empty, will fall back to auto-generated
-    delete config[projectName];
+    if (config[projectName]) {
+      delete config[projectName].displayName;
+      // Only remove the entire entry if no other properties remain
+      if (Object.keys(config[projectName]).length === 0) {
+        delete config[projectName];
+      }
+    }
   } else {
-    // Set custom display name
+    // Merge displayName, preserving manuallyAdded, originalPath, etc.
     config[projectName] = {
+      ...config[projectName],
       displayName: newDisplayName.trim()
     };
   }
-  
+
   await saveProjectConfig(config);
   return true;
 }
@@ -981,21 +1121,21 @@ async function renameProject(projectName, newDisplayName) {
 // Delete a session from a project
 async function deleteSession(projectName, sessionId) {
   const projectDir = path.join(os.homedir(), '.claude', 'projects', projectName);
-  
+
   try {
     const files = await fs.readdir(projectDir);
     const jsonlFiles = files.filter(file => file.endsWith('.jsonl'));
-    
+
     if (jsonlFiles.length === 0) {
       throw new Error('No session files found for this project');
     }
-    
+
     // Check all JSONL files to find which one contains the session
     for (const file of jsonlFiles) {
       const jsonlFile = path.join(projectDir, file);
       const content = await fs.readFile(jsonlFile, 'utf8');
       const lines = content.split('\n').filter(line => line.trim());
-      
+
       // Check if this file contains the session
       const hasSession = lines.some(line => {
         try {
@@ -1005,7 +1145,7 @@ async function deleteSession(projectName, sessionId) {
           return false;
         }
       });
-      
+
       if (hasSession) {
         // Filter out all entries for this session
         const filteredLines = lines.filter(line => {
@@ -1016,13 +1156,13 @@ async function deleteSession(projectName, sessionId) {
             return true; // Keep malformed lines
           }
         });
-        
+
         // Write back the filtered content
         await fs.writeFile(jsonlFile, filteredLines.join('\n') + (filteredLines.length > 0 ? '\n' : ''));
         return true;
       }
     }
-    
+
     throw new Error(`Session ${sessionId} not found in any files`);
   } catch (error) {
     console.error(`Error deleting session ${sessionId} from project ${projectName}:`, error);
@@ -1098,6 +1238,269 @@ async function deleteProject(projectName, force = false) {
   }
 }
 
+/**
+ * Create .claude, .agents, .cursor and their skills subdirs in the project,
+ * and symlink each VibeLab skill directory into those skills subdirs.
+ * Also creates pipeline folders: Ideation, Experiment, Publication.
+ * Failures are logged but do not throw (project add still succeeds).
+ */
+async function collectSkillDirs(baseDir) {
+  const results = []; // { name, absolutePath }
+
+  async function walk(dir) {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const hasSkillMd = entries.some(e => e.isFile() && e.name === 'SKILL.md');
+    if (hasSkillMd) {
+      results.push({ name: path.basename(dir), absolutePath: dir });
+      return; // Don't recurse deeper into a skill directory
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        await walk(path.join(dir, entry.name));
+      }
+    }
+  }
+
+  await walk(baseDir);
+  return results;
+}
+
+/**
+ * Load the set of core (platform-native) skill names from skill-tag-mapping.json.
+ * Returns a Set of skill directory names that are considered "core pipeline" skills.
+ */
+function getCoreSkillNames() {
+  try {
+    const mappingPath = path.join(VIBELAB_SKILLS_DIR, 'skill-tag-mapping.json');
+    const raw = fsSync.readFileSync(mappingPath, 'utf8');
+    const mapping = JSON.parse(raw);
+    const names = new Set(mapping.platformNativeSkills || []);
+    // inno-pipeline-planner is always core but not in platformNativeSkills
+    names.add('inno-pipeline-planner');
+    // bioinformatics-init-analysis resolves to dir name 'init-analysis' via collectSkillDirs
+    names.add('init-analysis');
+    return names;
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Generate a compact skills-index.md for the .agents/skills/ directory.
+ * Reads YAML frontmatter (name, description) from each SKILL.md and produces
+ * a markdown table grouped by Core Pipeline Skills vs Library Skills.
+ *
+ * @param {Array<{name: string, absolutePath: string}>} skillDirs
+ * @returns {string} Markdown content for skills-index.md
+ */
+async function generateSkillsIndex(skillDirs) {
+  const matter = (await import('gray-matter')).default;
+  const coreNames = getCoreSkillNames();
+
+  const coreSkills = [];
+  const librarySkills = [];
+
+  for (const { name, absolutePath } of skillDirs) {
+    const skillMdPath = path.join(absolutePath, 'SKILL.md');
+    let skillName = name;
+    let description = '';
+    try {
+      const content = await fs.readFile(skillMdPath, 'utf8');
+      const { data } = matter(content);
+      if (data.name) skillName = data.name;
+      if (data.description) {
+        // Collapse newlines (YAML block scalars) and escape pipe chars for markdown tables
+        const cleaned = data.description.replace(/[\r\n]+/g, ' ').replace(/\|/g, '/').trim();
+        description = cleaned.length > 120
+          ? cleaned.slice(0, 117) + '...'
+          : cleaned;
+      }
+    } catch {
+      // Skip skills with unreadable SKILL.md
+      continue;
+    }
+
+    const entry = { dirName: name, skillName, description };
+    if (coreNames.has(name)) {
+      coreSkills.push(entry);
+    } else {
+      librarySkills.push(entry);
+    }
+  }
+
+  coreSkills.sort((a, b) => a.dirName.localeCompare(b.dirName));
+  librarySkills.sort((a, b) => a.dirName.localeCompare(b.dirName));
+
+  const lines = [
+    '# Skills Index',
+    '',
+    '> **Do NOT read all SKILL.md files at once.** Use this index to find the right skill, then read only that one.',
+    '',
+    '## Core Pipeline Skills',
+    '',
+    '| Skill | Path | Description |',
+    '|-------|------|-------------|',
+  ];
+  for (const s of coreSkills) {
+    lines.push(`| ${s.skillName} | \`.agents/skills/${s.dirName}/SKILL.md\` | ${s.description} |`);
+  }
+
+  lines.push('', '## Library Skills', '');
+  lines.push('| Skill | Path | Description |');
+  lines.push('|-------|------|-------------|');
+  for (const s of librarySkills) {
+    lines.push(`| ${s.skillName} | \`.agents/skills/library/${s.dirName}/SKILL.md\` | ${s.description} |`);
+  }
+
+  lines.push('');
+  return lines.join('\n');
+}
+
+async function ensureProjectSkillLinks(projectPath) {
+  try {
+    for (const dir of PROJECT_PIPELINE_FOLDERS) {
+      await fs.mkdir(path.join(projectPath, dir), { recursive: true });
+    }
+    // Create preset research subdirs so the workspace structure is ready to use.
+    const presetSubdirs = [
+      'Ideation/ideas',
+      'Ideation/references',
+      'Experiment/code_references',
+      'Experiment/datasets',
+      'Experiment/core_code',
+      'Experiment/analysis',
+      'Publication/paper',
+      'Publication/homepage',
+      'Publication/slide',
+      'Research'
+    ];
+    for (const rel of presetSubdirs) {
+      await fs.mkdir(path.join(projectPath, rel), { recursive: true });
+    }
+  } catch (err) {
+    console.error('[projects] Failed to create pipeline folders or preset subdirs:', err.message);
+  }
+
+  // Keep creating instance.json for new projects.
+  const instancePath = path.join(projectPath, 'instance.json');
+  try {
+    const projectBasename = path.basename(projectPath);
+    const createdAt = new Date().toISOString();
+    const instanceId = `${projectBasename}_${createdAt.replace(/[:.]/g, '-')}`;
+    const instanceTemplate = {
+      instance_id: instanceId,
+      idea_maturity: '',
+      created_at: createdAt,
+      instance: instancePath,
+      category: '',
+      Ideation: {
+        ideas: path.join(projectPath, 'Ideation', 'ideas'),
+        references: path.join(projectPath, 'Ideation', 'references')
+      },
+      Experiment: {
+        code_references: path.join(projectPath, 'Experiment', 'code_references'),
+        datasets: path.join(projectPath, 'Experiment', 'datasets'),
+        core_code: path.join(projectPath, 'Experiment', 'core_code'),
+        analysis: path.join(projectPath, 'Experiment', 'analysis')
+      },
+      Publication: {
+        paper: path.join(projectPath, 'Publication', 'paper'),
+        homepage: path.join(projectPath, 'Publication', 'homepage'),
+        slide: path.join(projectPath, 'Publication', 'slide')
+      }
+    };
+    const hasInstance = await fs.access(instancePath).then(() => true).catch(() => false);
+    if (!hasInstance) {
+      await fs.writeFile(instancePath, JSON.stringify(instanceTemplate, null, 2), 'utf8');
+    }
+  } catch (err) {
+    console.error('[projects] Failed to create instance.json:', err.message);
+  }
+
+  // Generate agent instruction templates (CLAUDE.md, .cursor/rules/project.md, AGENTS.md)
+  try {
+    const { writeProjectTemplates } = await import('./templates/index.js');
+    await writeProjectTemplates(projectPath);
+  } catch (err) {
+    console.error('[projects] Failed to write agent templates:', err.message);
+  }
+
+  try {
+    await fs.access(VIBELAB_SKILLS_DIR);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.warn('[projects] VibeLab skills dir not found, skipping skill symlinks:', VIBELAB_SKILLS_DIR);
+      return;
+    }
+    console.error('[projects] Cannot access VibeLab skills dir:', err.message);
+    return;
+  }
+
+  try {
+    const skillDirs = await collectSkillDirs(VIBELAB_SKILLS_DIR);
+    if (skillDirs.length === 0) return;
+
+    // Warn about name collisions
+    const seen = new Map();
+    for (const skill of skillDirs) {
+      if (seen.has(skill.name)) {
+        console.warn(`[projects] Skill name collision: "${skill.name}" found at both ${seen.get(skill.name)} and ${skill.absolutePath}`);
+      } else {
+        seen.set(skill.name, skill.absolutePath);
+      }
+    }
+
+    const coreNames = getCoreSkillNames();
+
+    for (const dir of PROJECT_SKILL_FOLDERS) {
+      const skillsSubdir = path.join(projectPath, dir, 'skills');
+      const isAgents = dir === '.agents';
+      try {
+        await fs.mkdir(skillsSubdir, { recursive: true });
+        if (isAgents) {
+          await fs.mkdir(path.join(skillsSubdir, 'library'), { recursive: true });
+        }
+      } catch (err) {
+        console.error(`[projects] Failed to create ${dir}/skills:`, err.message);
+        continue;
+      }
+
+      for (const { name, absolutePath } of skillDirs) {
+        // For .agents/: core skills at top level, library skills under library/
+        const linkPath = isAgents && !coreNames.has(name)
+          ? path.join(skillsSubdir, 'library', name)
+          : path.join(skillsSubdir, name);
+        try {
+          try {
+            await fs.unlink(linkPath);
+          } catch (_) {
+            // ignore if not exists or not a symlink
+          }
+          // Clean up stale top-level symlink when migrating library skills into library/
+          if (isAgents && !coreNames.has(name)) {
+            try { await fs.unlink(path.join(skillsSubdir, name)); } catch (_) {}
+          }
+          await fs.symlink(absolutePath, linkPath, 'dir');
+        } catch (err) {
+          console.error(`[projects] Failed to symlink ${name} in ${dir}/skills:`, err.message);
+        }
+      }
+
+      // Write the skills index for .agents/ so Codex can discover skills lazily
+      if (isAgents) {
+        try {
+          const indexContent = await generateSkillsIndex(skillDirs);
+          await fs.writeFile(path.join(skillsSubdir, 'skills-index.md'), indexContent, 'utf8');
+        } catch (err) {
+          console.error('[projects] Failed to write skills-index.md:', err.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[projects] ensureProjectSkillLinks failed:', err.message);
+  }
+}
+
 // Add a project manually to the config (without creating folders)
 async function addProjectManually(projectPath, displayName = null) {
   const absolutePath = path.resolve(projectPath);
@@ -1132,16 +1535,24 @@ async function addProjectManually(projectPath, displayName = null) {
   if (displayName) {
     config[projectName].displayName = displayName;
   }
-  
+
   await saveProjectConfig(config);
-  
-  
+
+  await ensureProjectSkillLinks(absolutePath);
+
+  let dirCreatedAt = null;
+  try {
+    const dirStat = await fs.stat(absolutePath);
+    dirCreatedAt = dirStat.birthtime.toISOString();
+  } catch (_) {}
+
   return {
     name: projectName,
     path: absolutePath,
     fullPath: absolutePath,
     displayName: displayName || await generateDisplayName(projectName, absolutePath),
     isManuallyAdded: true,
+    createdAt: dirCreatedAt,
     sessions: [],
     cursorSessions: []
   };
@@ -1153,7 +1564,7 @@ async function getCursorSessions(projectPath) {
     // Calculate cwdID hash for the project path (Cursor uses MD5 hash)
     const cwdId = crypto.createHash('md5').update(projectPath).digest('hex');
     const cursorChatsPath = path.join(os.homedir(), '.cursor', 'chats', cwdId);
-    
+
     // Check if the directory exists
     try {
       await fs.access(cursorChatsPath);
@@ -1161,19 +1572,19 @@ async function getCursorSessions(projectPath) {
       // No sessions for this project
       return [];
     }
-    
+
     // List all session directories
     const sessionDirs = await fs.readdir(cursorChatsPath);
     const sessions = [];
-    
+
     for (const sessionId of sessionDirs) {
       const sessionPath = path.join(cursorChatsPath, sessionId);
       const storeDbPath = path.join(sessionPath, 'store.db');
-      
+
       try {
         // Check if store.db exists
         await fs.access(storeDbPath);
-        
+
         // Capture store.db mtime as a reliable fallback timestamp
         let dbStatMtimeMs = null;
         try {
@@ -1187,12 +1598,12 @@ async function getCursorSessions(projectPath) {
           driver: sqlite3.Database,
           mode: sqlite3.OPEN_READONLY
         });
-        
+
         // Get metadata from meta table
         const metaRows = await db.all(`
           SELECT key, value FROM meta
         `);
-        
+
         // Parse metadata
         let metadata = {};
         for (const row of metaRows) {
@@ -1211,17 +1622,17 @@ async function getCursorSessions(projectPath) {
             }
           }
         }
-        
+
         // Get message count
         const messageCountResult = await db.get(`
           SELECT COUNT(*) as count FROM blobs
         `);
-        
+
         await db.close();
-        
+
         // Extract session info
         const sessionName = metadata.title || metadata.sessionTitle || 'Untitled Session';
-        
+
         // Determine timestamp - prefer createdAt from metadata, fall back to db file mtime
         let createdAt = null;
         if (metadata.createdAt) {
@@ -1231,7 +1642,7 @@ async function getCursorSessions(projectPath) {
         } else {
           createdAt = new Date().toISOString();
         }
-        
+
         sessions.push({
           id: sessionId,
           name: sessionName,
@@ -1240,18 +1651,18 @@ async function getCursorSessions(projectPath) {
           messageCount: messageCountResult.count || 0,
           projectPath: projectPath
         });
-        
+
       } catch (error) {
         console.warn(`Could not read Cursor session ${sessionId}:`, error.message);
       }
     }
-    
+
     // Sort sessions by creation time (newest first)
     sessions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    
+
     // Return only the first 5 sessions for performance
     return sessions.slice(0, 5);
-    
+
   } catch (error) {
     console.error('Error fetching Cursor sessions:', error);
     return [];

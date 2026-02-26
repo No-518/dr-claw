@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeviceSettings } from '../../../hooks/useDeviceSettings';
 import { useVersionCheck } from '../../../hooks/useVersionCheck';
@@ -9,6 +9,8 @@ import { useTasksSettings } from '../../../contexts/TasksSettingsContext';
 import SidebarCollapsed from './subcomponents/SidebarCollapsed';
 import SidebarContent from './subcomponents/SidebarContent';
 import SidebarModals from './subcomponents/SidebarModals';
+import { api } from '../../../utils/api';
+import { generateWorkspaceName } from '../../../utils/workspaceNameGenerator';
 import type { Project } from '../../../types/app';
 import type { SidebarProjectListProps } from './subcomponents/SidebarProjectList';
 import type { MCPServerStatus, SidebarProps } from '../types/types';
@@ -38,9 +40,9 @@ function Sidebar({
 }: SidebarProps) {
   const { t } = useTranslation(['sidebar', 'common']);
   const { isPWA } = useDeviceSettings({ trackMobile: false });
-  const { updateAvailable, latestVersion, currentVersion, releaseInfo } = useVersionCheck(
-    'siteboon',
-    'claudecodeui',
+  const { updateAvailable, latestVersion, currentVersion, releaseInfo, installMode } = useVersionCheck(
+    'OpenLAIR',
+    'VibeLab',
   );
   const { preferences, setPreference } = useUiPreferences();
   const { sidebarVisible } = preferences;
@@ -118,6 +120,8 @@ function Sidebar({
     document.body.classList.toggle('pwa-mode', isPWA);
   }, [isPWA]);
 
+  const [creatingProject, setCreatingProject] = useState(false);
+
   const handleProjectCreated = () => {
     if (window.refreshProjects) {
       void window.refreshProjects();
@@ -126,6 +130,37 @@ function Sidebar({
 
     window.location.reload();
   };
+
+  const handleQuickCreateProject = useCallback(async () => {
+    if (creatingProject) return;
+    setCreatingProject(true);
+    try {
+      const fsResponse = await (api as any).browseFilesystem('~');
+      const fsData = await fsResponse.json();
+      const homePath = fsData.path || '~';
+      const name = generateWorkspaceName();
+      const workspacePath = `${homePath}/${name}`;
+
+      const response = await api.createWorkspace({ workspaceType: 'new', path: workspacePath });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error('Failed to quick-create project:', data.error || data.details);
+        return;
+      }
+
+      if (window.refreshProjects) {
+        await window.refreshProjects();
+      }
+
+      if (data.project) {
+        handleProjectSelect(data.project as Project);
+      }
+    } catch (err) {
+      console.error('Error quick-creating project:', err);
+    } finally {
+      setCreatingProject(false);
+    }
+  }, [creatingProject, handleProjectSelect]);
 
   const projectListProps: SidebarProjectListProps = {
     projects,
@@ -186,9 +221,6 @@ function Sidebar({
         showSettings={showSettings}
         settingsInitialTab={settingsInitialTab}
         onCloseSettings={onCloseSettings}
-        showNewProject={showNewProject}
-        onCloseNewProject={() => setShowNewProject(false)}
-        onProjectCreated={handleProjectCreated}
         deleteConfirmation={deleteConfirmation}
         onCancelDeleteProject={() => setDeleteConfirmation(null)}
         onConfirmDeleteProject={confirmDeleteProject}
@@ -200,6 +232,7 @@ function Sidebar({
         releaseInfo={releaseInfo}
         currentVersion={currentVersion}
         latestVersion={latestVersion}
+        installMode={installMode}
         t={t}
       />
 
@@ -225,7 +258,7 @@ function Sidebar({
               void refreshProjects();
             }}
             isRefreshing={isRefreshing}
-            onCreateProject={() => setShowNewProject(true)}
+            onCreateProject={() => void handleQuickCreateProject()}
             onCollapseSidebar={handleCollapseSidebar}
             updateAvailable={updateAvailable}
             releaseInfo={releaseInfo}

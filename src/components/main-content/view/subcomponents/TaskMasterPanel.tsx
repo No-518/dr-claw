@@ -184,7 +184,7 @@ export default function TaskMasterPanel({ isVisible }: TaskMasterPanelProps) {
           onClose={handleClosePrdEditor}
           isNewFile={!selectedPRD?.isExisting}
           file={{
-            name: selectedPRD?.name || 'prd.txt',
+            name: selectedPRD?.name || 'research_brief.json',
             content: selectedPRD?.content || '',
           }}
           onSave={handlePrdSave}

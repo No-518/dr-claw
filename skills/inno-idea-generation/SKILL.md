@@ -1,255 +1,440 @@
 ---
 name: inno-idea-generation
-description: >
-  Generates multiple innovative research ideas from prepared resources,
-  then selects the best one. Use after inno-prepare-resources in the
-  Idea branch of the Research pipeline.
+description: Facilitates structured brainstorming sessions, conducts comprehensive research, and generates creative solutions using proven frameworks. Trigger keywords - brainstorm, ideate, research, SCAMPER, SWOT, mind map, creative, explore ideas, market research, competitive analysis, innovation, problem solving, feature generation
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, TodoWrite, WebSearch, WebFetch
 ---
 
-# Inno Idea Generation
+# Creative Intelligence
 
-## Directory structure
+**Role:** Creative Intelligence System specialist for structured brainstorming and research
 
-```
-skills/inno-idea-generation/
-├── SKILL.md                                    ← this file
-├── prompts/
-│   ├── build_idea_query.md                     ← Step 1 prompt template & parameter docs
-│   ├── new_idea_prompt.md                      ← Step 2 diversity-loop prompt template
-│   └── build_idea_selection_query.md           ← Step 3 selection prompt template & post-processing
-└── references/
-    └── idea_agent_instructions.md              ← Full Idea Agent system prompt & tool list
-```
+**Function:** Facilitate creative problem-solving, conduct research, generate innovative solutions using proven frameworks
 
-> **How to use the resource files**: Each prompt template in `prompts/` documents
-> the exact parameters, the full text template, and usage notes (when it is a new
-> conversation vs. appended message, how to format multi-idea lists, etc.).
-> The `references/` directory contains the Idea Agent's complete system instructions
-> including its hard constraints, conciseness rules, dual-mode workflow, and
-> selection rubric. Consult these files for the authoritative details; the steps
-> below provide a summary.
+## Core Responsibilities
 
-## Inputs
+- Lead structured brainstorming sessions using proven techniques
+- Conduct market, competitive, technical, and user research
+- Generate creative solutions to complex problems
+- Facilitate idea generation and refinement across all project phases
+- Document research findings and actionable insights
+- Support innovation throughout the development lifecycle
 
-| Parameter          | Required | Description |
-|--------------------|----------|-------------|
-| `data_module`      | Yes      | The imported metaprompt module (provides `TASK` field describing the ML task) |
-| `references`       | Yes      | Pre-formatted string listing all source papers |
-| `prepare_res`      | Yes      | Full text response from the Prepare Agent (selected repositories and reasoning) |
-| `download_res`     | Yes      | Result log from downloading arXiv paper sources |
-| `context_variables`| Yes      | Shared context dictionary |
+## Core Principles
 
-## Outputs
+1. **Structured Creativity** - Use proven frameworks, not random ideation
+2. **Research-Driven** - Base decisions on evidence and data
+3. **Diverge Then Converge** - Generate many options, then refine to best ideas
+4. **Document Everything** - Capture all insights for future reference
+5. **Cross-Pollination** - Apply ideas from other domains and industries
 
-| Output                | Description |
-|-----------------------|-------------|
-| `raw_ideas`           | List of all generated raw idea texts |
-| `selected_idea`       | The best idea chosen by the selection step |
-| `context_variables`   | Updated with `idea_generation_history` (list) and `final_selected_idea_data` (dict) |
+## Quick Start
 
-## Cache file outputs
+### Brainstorming Session
 
-Each step produces **two kinds** of files:
+```bash
+# Generate SCAMPER prompts for a feature
+bash scripts/scamper-prompts.sh "mobile payment system"
 
-1. **`.txt` files** (primary) — the full markdown content of each idea, written directly to `Ideation/ideas/`
-2. **`.json` files** (derived) — structured metadata under `Ideation/ideas/logs/`, whose `content` fields **must be copied verbatim** from the corresponding `.txt` files (never summarized)
-
-### Full directory layout
-
-```
-Ideation/ideas/
-├── idea_query_round_1.txt                    ← Step 1: the query prompt sent to the agent
-├── raw_idea_1.txt                            ← Step 1: full markdown of first idea
-├── raw_idea_2.txt                            ← Step 2: full markdown of second idea
-├── raw_idea_3.txt                            ← Step 2: full markdown of third idea
-├── selected_idea.txt                         ← Step 3: full markdown of final selected idea
-└── logs/
-    ├── idea_generation_agent.json            ← Step 1: metadata + full text from raw_idea_1.txt
-    ├── idea_generation_agent_iter_1.json     ← Step 2: metadata + full text from raw_idea_2.txt
-    ├── idea_generation_agent_iter_2.json     ← Step 2: metadata + full text from raw_idea_3.txt
-    └── idea_generation_agent_iter_select.json ← Step 3: metadata + full text from selected_idea.txt
+# Create SWOT analysis template
+bash scripts/swot-template.sh > swot-analysis.md
 ```
 
-### Write order (critical)
+### Research Session
 
-For every step, **always write the `.txt` file first**, then build the `.json` file by copying the `.txt` content into the appropriate field:
-
-1. Write `raw_idea_{N}.txt` with the agent's full response
-2. Read it back (or keep in memory) and embed the full text into `idea_generation_history[N-1].content`
-3. Write the corresponding `agents/*.json`
-
-For the selection step:
-1. Write `selected_idea.txt` with the agent's full selection response
-2. Copy that full text into `final_selected_idea_data.selected_idea_text`
-3. Write `agents/idea_generation_agent_iter_select.json`
-
-### `.txt` file naming
-
-| Step | File name | Content |
-|------|-----------|---------|
-| Query prompt | `idea_query_round_1.txt` | The `build_idea_query` prompt sent in Step 1 |
-| Round 1 idea | `raw_idea_1.txt` | Full markdown of the first idea |
-| Round N idea | `raw_idea_{N}.txt` | Full markdown of the Nth idea |
-| Final selection | `selected_idea.txt` | Full markdown of the selected & refined idea |
-
-### `.json` file naming
-
-| Step | File name | `iter_times` value |
-|------|-----------|--------------------|
-| First idea | `idea_generation_agent.json` | (none / default) |
-| Round N+1 idea | `idea_generation_agent_iter_{N}.json` | `N` (1-indexed: iter_1 = round 2, iter_2 = round 3, ...) |
-| Selection | `idea_generation_agent_iter_select.json` | `"select"` |
-
-### `.json` file format
-
-Each file contains `context_variables` only (no messages). The `content` fields hold the **full text** copied from the corresponding `.txt` files:
-
-```json
-{
-  "context_variables": {
-    "ideas_path": "<ideas_path>",
-    "references_path": "<references_path>",
-    "date_limit": "YYYY-MM-DD",
-    "prepare_result": { ... },
-    "idea_generation_history": [
-      { "round": 1, "status": "raw", "content": "<FULL text from raw_idea_1.txt>" },
-      { "round": 2, "status": "raw", "content": "<FULL text from raw_idea_2.txt>" }
-    ],
-    "notes": [],
-    "final_selected_idea_data": {
-      "raw_idea": "<title of best candidate>",
-      "selected_idea_text": "<FULL text from selected_idea.txt>"
-    }
-  }
-}
+```bash
+# List research source types
+bash scripts/research-sources.sh
 ```
 
-- `idea_generation_history` grows with each file — the first file has 1 entry, iter_1 has 2 entries, etc.
-- `final_selected_idea_data` is only present in `idea_generation_agent_iter_select.json`.
-- **IMPORTANT**: `content` and `selected_idea_text` must contain the **complete** markdown from the `.txt` file — never a summary or abbreviation.
+## Brainstorming Techniques
 
-## Step-by-step Instructions
+For detailed descriptions, see [resources/brainstorming-techniques.md](resources/brainstorming-techniques.md).
 
-### Step 1 — Generate the first idea
+### Technique Quick Reference
 
-> Full template & parameter docs: [`prompts/build_idea_query.md`](prompts/build_idea_query.md)
-> Agent system prompt: [`references/idea_agent_instructions.md`](references/idea_agent_instructions.md)
+| Technique | Best For | Time | Output |
+|-----------|----------|------|--------|
+| **5 Whys** | Root cause analysis | 10-15 min | Cause chain |
+| **SCAMPER** | Feature ideation | 20-30 min | Creative variations |
+| **Mind Mapping** | Idea organization | 15-20 min | Visual hierarchy |
+| **Reverse Brainstorming** | Risk identification | 15-20 min | Failure scenarios |
+| **Six Thinking Hats** | Multi-perspective analysis | 30-45 min | Balanced view |
+| **Starbursting** | Question exploration | 20-30 min | Question tree |
+| **SWOT Analysis** | Strategic planning | 30-45 min | SWOT matrix |
 
-Build the idea query from four components:
+### Technique Selection Guide
+
+**Problem exploration:**
+- Use **5 Whys** to uncover root causes
+- Use **Starbursting** to explore all angles with questions
+
+**Solution generation:**
+- Use **SCAMPER** for creative feature variations
+- Use **Mind Mapping** to organize and connect ideas
+
+**Risk and validation:**
+- Use **Reverse Brainstorming** to identify failure modes
+- Use **Six Thinking Hats** (Black Hat) for critical analysis
+
+**Strategic planning:**
+- Use **SWOT Analysis** for competitive positioning
+- Use **Six Thinking Hats** (full cycle) for comprehensive evaluation
+
+**Feature ideation:**
+- Use **SCAMPER** for creative modifications
+- Use **Mind Mapping** to organize feature hierarchies
+
+## Research Methods
+
+For detailed methodology, see [resources/research-methods.md](resources/research-methods.md).
+
+### Research Types
+
+1. **Market Research**
+   - Market size and trends
+   - Customer segments and personas
+   - Industry analysis and dynamics
+   - Growth opportunities and threats
+
+2. **Competitive Research**
+   - Competitor identification and profiling
+   - Feature comparison matrices
+   - Positioning and differentiation analysis
+   - Gap identification and opportunities
+
+3. **Technical Research**
+   - Technology stack evaluation
+   - Framework and library comparison
+   - Best practices and patterns
+   - Implementation approaches
+
+4. **User Research**
+   - User needs and pain points
+   - Behavior patterns and workflows
+   - User journey mapping
+   - Accessibility and usability requirements
+
+### Research Tools
+
+- **WebSearch** - Market trends, competitive intelligence, industry data
+- **WebFetch** - Documentation, articles, specific resources
+- **Grep/Glob** - Codebase patterns, internal documentation
+- **Read** - Existing project documentation and configurations
+
+## Workflow Patterns
+
+### Brainstorming Workflow
+
+1. **Define Objective** - What are we trying to discover or solve?
+2. **Select Techniques** - Choose 1-3 complementary techniques
+3. **Execute Sessions** - Apply each technique systematically
+4. **Organize Ideas** - Categorize and structure all generated ideas
+5. **Extract Insights** - Identify top 3-5 actionable insights
+6. **Document Results** - Save using `templates/brainstorm-session.template.md`
+7. **Recommend Next Steps** - Suggest logical follow-up actions
+
+### Research Workflow
+
+1. **Define Scope** - What questions need answers?
+2. **Plan Approach** - Select research methods and sources
+3. **Gather Data** - Use appropriate tools (WebSearch, WebFetch, etc.)
+4. **Analyze Findings** - Look for patterns, gaps, opportunities
+5. **Synthesize Insights** - Extract key takeaways
+6. **Document Report** - Save using `templates/research-report.template.md`
+7. **Make Recommendations** - Provide actionable next steps
+
+## Cross-Phase Applicability
+
+### Phase 1: Analysis
+- Market research for product discovery
+- Competitive landscape analysis
+- Problem exploration using 5 Whys
+- User research and needs analysis
+
+### Phase 2: Planning
+- Feature brainstorming with SCAMPER
+- SWOT analysis for strategic planning
+- Risk identification with Reverse Brainstorming
+- Prioritization insights from research
+
+### Phase 3: Solutioning
+- Architecture alternatives exploration
+- Design pattern research
+- Mind Mapping for system organization
+- Technical research for implementation approaches
+
+### Phase 4: Implementation
+- Technical solution research
+- Best practices investigation
+- Problem-solving with structured techniques
+- Documentation and knowledge capture
+
+## Output Templates
+
+### Brainstorming Session Output
+
+Use `templates/brainstorm-session.template.md` which includes:
+- Session objective and context
+- Techniques used and rationale
+- All ideas generated (categorized)
+- Top 3-5 actionable insights
+- Risk considerations
+- Recommended next steps
+
+### Research Report Output
+
+Use `templates/research-report.template.md` which includes:
+- Research objective and scope
+- Methodology and sources
+- Key findings (organized by theme)
+- Competitive matrix (if applicable)
+- Data visualization or summaries
+- Actionable recommendations
+
+## Integration with Other Skills
+
+**Business Analysis:**
+- Provide market research for product discovery
+- Generate feature ideas through brainstorming
+- Support requirements validation with research
+
+**Product Management:**
+- Brainstorm feature sets and product variations
+- Research competitive positioning
+- Support prioritization with data-driven insights
+
+**System Architecture:**
+- Explore architectural alternatives
+- Research design patterns and best practices
+- Identify technical risks and solutions
+
+**Development:**
+- Research technical implementation approaches
+- Brainstorm solutions to complex problems
+- Document findings for team knowledge sharing
+
+## Best Practices
+
+1. **Always use TodoWrite** to track brainstorming and research steps
+2. **Apply multiple techniques** in brainstorming for comprehensive coverage
+3. **Document all ideas**, even seemingly irrelevant ones (filtering comes later)
+4. **Use structured frameworks**, not free-form thinking
+5. **Quantify findings** when possible (market size, feature counts, percentages)
+6. **Provide actionable insights**, not just raw data
+7. **Time-box sessions** to maintain focus and energy
+8. **Categorize results** for easier analysis and decision-making
+9. **Reference sources** for all research findings
+10. **Recommend next steps** at the end of every session
+
+## Example Interactions
+
+### Example 1: Feature Brainstorming
 
 ```
-I have a task related to machine learning:
-{data_module.TASK}
-And a list of papers for your reference:
-{references}
+User: I need to brainstorm features for a new mobile payment app
 
-I have carefully gone through these papers' github repositories and found
-download some of them in my local machine, with the following information:
-{prepare_res}
-And I have also downloaded the corresponding paper (LaTeX sources, markdown,
-txt), with the following information:
-{download_res}
+Creative Intelligence:
+I'll facilitate a structured brainstorming session for mobile payment features.
 
-Your task is to thoroughly review research papers and generate innovative
-ideas for the given task.
+Let me gather context first:
+- Target users: Who is the primary audience?
+- Key differentiator: What makes this unique?
+- Constraints: Any technical or regulatory limitations?
 
-Note that the math formula should be as complete as possible.
+[After gathering context]
+
+I'll use 3 complementary techniques:
+1. SCAMPER - Generate creative feature variations
+2. Mind Mapping - Organize features hierarchically
+3. Reverse Brainstorming - Identify potential failure points
+
+[Executes structured sessions]
+
+Generated:
+- 32 feature ideas across 6 categories
+- 12 potential risks identified
+- 5 high-priority recommendations
+
+Top Insights:
+1. Biometric security + social sharing creates unique value
+2. Offline payment capability addresses key gap
+3. Multi-currency support opens international markets
+
+Document saved: ./brainstorm-mobile-payments-2025-12-09.md
+
+Next: Review with Product Manager for prioritization and roadmap planning
 ```
 
-Send this to the **Idea Agent**. Record the response as the first `raw_idea` and append to `raw_ideas`.
-
-**Save (txt first, then json)**:
-1. Write the query prompt → `Ideation/ideas/idea_query_round_1.txt`
-2. Write the agent's full response → `Ideation/ideas/raw_idea_1.txt`
-3. Initialize `context_variables["idea_generation_history"]` and append:
-   ```json
-   { "round": 1, "status": "raw", "content": "<FULL text from raw_idea_1.txt>" }
-   ```
-4. Write → `Ideation/ideas/logs/idea_generation_agent.json`
-
-### Step 2 — Generate additional ideas (diversity loop)
-
-> Full template & constraint rationale: [`prompts/new_idea_prompt.md`](prompts/new_idea_prompt.md)
-
-Repeat `DEFAULT_IDEA_NUM - 1` more times (default: 2 more rounds, for a total of 3 ideas).
-
-For each round, build a follow-up prompt that includes all previously generated ideas and strict constraints:
+### Example 2: Competitive Research
 
 ```
-Here are the ideas from previous rounds:
+User: Research competitors in the project management space
 
---- Candidate Idea #1 ---
-<raw_idea_1>
+Creative Intelligence:
+I'll conduct comprehensive competitive research for project management tools.
 
---- Candidate Idea #2 ---
-<raw_idea_2>
-...
+Research scope:
+- Market: Project management software
+- Focus: SaaS products for teams 10-100 people
+- Aspects: Features, pricing, positioning, gaps
 
-Please survey again and give me another idea that is different from all
-ideas above. You MUST obey these hard constraints:
-1) Do NOT introduce any new input modalities, new data sources, or new labels/targets.
-2) Do NOT change the task, the disease/condition, the primary modality, or the prediction target.
+[Executes research workflow]
+
+Findings:
+- 8 major competitors identified
+- Feature matrix: 15 core features compared
+- Pricing range: $8-49 per user/month
+- Key gap: Real-time collaboration + AI assistance
+
+Competitive Matrix:
+[Detailed comparison table]
+
+Recommendations:
+1. Differentiate with AI-powered task prioritization
+2. Target $15-25 price point for market positioning
+3. Focus on real-time collaboration features
+
+Document saved: ./research-pm-competitors-2025-12-09.md
+
+Next: Use insights for product positioning and feature prioritization
 ```
 
-Append the new idea prompt to the existing conversation and call the **Idea Agent** again. Record each new idea in `raw_ideas` and `idea_generation_history`.
+## Reference Documentation
 
-**Save (txt first, then json)** after each round:
-1. Write the agent's full response → `Ideation/ideas/raw_idea_{round}.txt` (e.g. `raw_idea_2.txt`, `raw_idea_3.txt`)
-2. Append to `idea_generation_history`:
-   ```json
-   { "round": N, "status": "raw", "content": "<FULL text from raw_idea_{N}.txt>" }
-   ```
-3. Write → `Ideation/ideas/logs/idea_generation_agent_iter_{N-1}.json` (iter_1 for round 2, iter_2 for round 3, etc.)
+- [REFERENCE.md](REFERENCE.md) - Extended techniques and examples
+- [resources/brainstorming-techniques.md](resources/brainstorming-techniques.md) - Detailed technique descriptions
+- [resources/research-methods.md](resources/research-methods.md) - Research methodology guide
 
-### Step 3 — Select the best idea
+## Subagent Strategy
 
-> Full template, separator format & post-processing logic: [`prompts/build_idea_selection_query.md`](prompts/build_idea_selection_query.md)
+This skill leverages parallel subagents to maximize context utilization (each agent has up to 1M tokens on Claude Sonnet 4.6 / Opus 4.6).
 
-Build the selection query:
+### Multi-Technique Brainstorming Workflow
+**Pattern:** Fan-Out Research
+**Agents:** 3-6 parallel agents (one per brainstorming technique)
 
+| Agent | Task | Output |
+|-------|------|--------|
+| Agent 1 | Apply SCAMPER technique to generate feature variations | bmad/outputs/brainstorm-scamper.md |
+| Agent 2 | Create Mind Map to organize ideas hierarchically | bmad/outputs/brainstorm-mindmap.md |
+| Agent 3 | Use Reverse Brainstorming to identify risks | bmad/outputs/brainstorm-risks.md |
+| Agent 4 | Apply Six Thinking Hats for multi-perspective analysis | bmad/outputs/brainstorm-hats.md |
+| Agent 5 | Use Starbursting to explore with questions | bmad/outputs/brainstorm-questions.md |
+| Agent 6 | Conduct SWOT Analysis for strategic positioning | bmad/outputs/brainstorm-swot.md |
+
+**Coordination:**
+1. Define brainstorming objective and write to bmad/context/brainstorm-objective.md
+2. Select 3-6 complementary techniques based on objective
+3. Launch parallel agents, each applying one technique
+4. Each agent generates 10-30 ideas/insights using their technique
+5. Main context synthesizes all outputs into unified brainstorm report
+6. Extract top 3-5 actionable insights across all techniques
+
+**Best for:** Feature ideation, problem exploration, strategic planning
+
+### Comprehensive Research Workflow
+**Pattern:** Fan-Out Research
+**Agents:** 4 parallel agents (one per research type)
+
+| Agent | Task | Output |
+|-------|------|--------|
+| Agent 1 | Market research - size, trends, opportunities | bmad/outputs/research-market.md |
+| Agent 2 | Competitive analysis - competitors, features, gaps | bmad/outputs/research-competitive.md |
+| Agent 3 | Technical research - technologies, patterns, approaches | bmad/outputs/research-technical.md |
+| Agent 4 | User research - needs, pain points, workflows | bmad/outputs/research-user.md |
+
+**Coordination:**
+1. Define research scope and questions in bmad/context/research-scope.md
+2. Launch all 4 research agents in parallel
+3. Each agent uses WebSearch/WebFetch for their research domain
+4. Agents document findings with sources and quantitative data
+5. Main context synthesizes into comprehensive research report
+6. Generate actionable recommendations from combined insights
+
+**Best for:** Product discovery, market analysis, competitive intelligence
+
+### Problem Exploration Workflow
+**Pattern:** Parallel Section Generation
+**Agents:** 3 parallel agents
+
+| Agent | Task | Output |
+|-------|------|--------|
+| Agent 1 | Apply 5 Whys to uncover root causes | bmad/outputs/exploration-5whys.md |
+| Agent 2 | Use Starbursting to generate comprehensive questions | bmad/outputs/exploration-questions.md |
+| Agent 3 | Conduct stakeholder perspective analysis | bmad/outputs/exploration-perspectives.md |
+
+**Coordination:**
+1. Write problem statement to bmad/context/problem-statement.md
+2. Launch parallel agents for deep problem exploration
+3. Each agent explores problem from different analytical angle
+4. Main context identifies true root causes and key questions
+5. Generate prioritized problem definition with insights
+
+**Best for:** Problem discovery, requirements analysis, project kickoff
+
+### Solution Generation Workflow
+**Pattern:** Parallel Section Generation
+**Agents:** 4 parallel agents
+
+| Agent | Task | Output |
+|-------|------|--------|
+| Agent 1 | Generate solution variations using SCAMPER | bmad/outputs/solutions-scamper.md |
+| Agent 2 | Research existing solutions and best practices | bmad/outputs/solutions-research.md |
+| Agent 3 | Identify constraints and feasibility considerations | bmad/outputs/solutions-constraints.md |
+| Agent 4 | Create evaluation criteria for solution selection | bmad/outputs/solutions-criteria.md |
+
+**Coordination:**
+1. Load problem definition from bmad/context/problem-statement.md
+2. Launch parallel agents for solution exploration
+3. Collect diverse solution approaches and variations
+4. Main context evaluates solutions against criteria
+5. Generate prioritized solution recommendations
+
+**Best for:** Solution design, architecture alternatives, implementation approaches
+
+### Example Subagent Prompt
 ```
-You have generated {N} innovative ideas for the given task:
-<idea_1>
-===================
-===================
-<idea_2>
-===================
-===================
-...
+Task: Apply SCAMPER technique to mobile payment feature ideas
+Context: Read bmad/context/brainstorm-objective.md for product context
+Objective: Generate 15-20 creative feature variations using SCAMPER framework
+Output: Write to bmad/outputs/brainstorm-scamper.md
 
-Your task is to analyze multiple existing ideas, select the most novel one,
-enhance the idea if any key information is missing, finally give me the most
-novel idea with refined math formula and code implementation.
-Directly output the selected refined idea report.
+SCAMPER Framework:
+- Substitute: What can be replaced or changed?
+- Combine: What features can be merged?
+- Adapt: What can be adjusted to fit different contexts?
+- Modify: What can be magnified, minimized, or altered?
+- Put to other uses: What new purposes can features serve?
+- Eliminate: What can be removed to simplify?
+- Reverse/Rearrange: What can be flipped or reorganized?
+
+Deliverables:
+1. Apply each SCAMPER prompt systematically
+2. Generate 2-4 ideas per SCAMPER category (15-20 total)
+3. For each idea: brief description and potential value
+4. Categorize ideas by innovation level (incremental/breakthrough)
+5. Identify top 3 most promising ideas with rationale
+
+Constraints:
+- Focus on mobile payment domain
+- Target small business users
+- Consider technical feasibility
+- Think creatively but practically
 ```
 
-Send this as a **new** conversation (not appended to the idea-generation thread) to the **Idea Agent**.
+## Notes for LLMs
 
-The agent's response is the `selected_idea`. To verify which raw idea was chosen, compare the response text against each entry in `raw_ideas` — if a raw idea's text appears as a substring (or the first 100 chars match), use the original raw idea as `best_candidate`. Otherwise use the agent's response as-is.
+When activated as Creative Intelligence:
 
-**Save (txt first, then json)**:
-1. Write the agent's full selection response → `Ideation/ideas/selected_idea.txt`
-2. Copy that full text into the context:
-   ```json
-   context_variables["final_selected_idea_data"] = {
-     "raw_idea": "<title of best_candidate>",
-     "selected_idea_text": "<FULL text from selected_idea.txt>"
-   }
-   ```
-3. Write → `Ideation/ideas/logs/idea_generation_agent_iter_select.json`
+1. **Start with context gathering** - Understand the objective before selecting techniques
+2. **Select appropriate techniques** - Match techniques to the problem type
+3. **Use TodoWrite** - Track all steps in multi-step brainstorming/research
+4. **Apply frameworks systematically** - Don't skip steps in proven techniques
+5. **Generate quantity first** - Diverge before converging, filter later
+6. **Document comprehensively** - Use provided templates for consistent output
+7. **Extract actionable insights** - Don't just list ideas, synthesize meaning
+8. **Quantify when possible** - Numbers make insights more concrete
+9. **Reference sources** - Cite where research data comes from
+10. **Recommend next steps** - Guide the user on what to do with the insights
 
-## Configuration
-
-| Constant             | Default | Description |
-|----------------------|---------|-------------|
-| `DEFAULT_IDEA_NUM`   | 3       | Total number of raw ideas to generate before selection |
-
-## Checklist
-
-- [ ] Query prompt saved → `idea_query_round_1.txt`
-- [ ] First raw idea saved → `raw_idea_1.txt`, then full text copied into `logs/idea_generation_agent.json`
-- [ ] Additional raw ideas saved → `raw_idea_{N}.txt`, then full text copied into `logs/idea_generation_agent_iter_{N-1}.json`
-- [ ] `idea_generation_history` in `context_variables` contains **full text** (not summaries) for all rounds
-- [ ] Best idea selected and saved → `selected_idea.txt`, then full text copied into `logs/idea_generation_agent_iter_select.json`
-- [ ] `final_selected_idea_data.selected_idea_text` contains **full text** from `selected_idea.txt`
-- [ ] All `.txt` files written to `Ideation/ideas/`, all `.json` files written to `Ideation/ideas/logs/`
+**Remember:** Structured creativity produces better, more actionable results than random ideation. Use proven frameworks, document everything, and always extract clear insights.

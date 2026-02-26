@@ -12,13 +12,13 @@ export const readProjectSortOrder = (): ProjectSortOrder => {
   try {
     const rawSettings = localStorage.getItem('claude-settings');
     if (!rawSettings) {
-      return 'name';
+      return 'date';
     }
 
     const settings = JSON.parse(rawSettings) as { projectSortOrder?: ProjectSortOrder };
-    return settings.projectSortOrder === 'date' ? 'date' : 'name';
+    return settings.projectSortOrder === 'name' ? 'name' : 'date';
   } catch {
-    return 'name';
+    return 'date';
   }
 };
 
@@ -123,13 +123,26 @@ export const getProjectLastActivity = (
 ): Date => {
   const sessions = getAllSessions(project, additionalSessions);
   if (sessions.length === 0) {
-    return new Date(0);
+    if (project.createdAt) {
+      return new Date(project.createdAt);
+    }
+    return new Date();
   }
 
-  return sessions.reduce((latest, session) => {
+  const latestSession = sessions.reduce((latest, session) => {
     const sessionDate = getSessionDate(session);
     return sessionDate > latest ? sessionDate : latest;
   }, new Date(0));
+
+  // A project's creation time may be newer than its oldest session activity.
+  // Use whichever is more recent so that freshly created projects with no
+  // activity don't sink below older projects that happen to share the same day.
+  if (project.createdAt) {
+    const created = new Date(project.createdAt);
+    return created > latestSession ? created : latestSession;
+  }
+
+  return latestSession;
 };
 
 export const sortProjects = (

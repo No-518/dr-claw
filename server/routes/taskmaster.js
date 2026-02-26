@@ -3,7 +3,7 @@
  * ====================
  * 
  * This module provides API endpoints for TaskMaster integration including:
- * - .taskmaster folder detection in project directories
+ * - .pipeline folder detection in project directories
  * - MCP server configuration detection
  * - TaskMaster state and metadata management
  */
@@ -12,117 +12,824 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { promises as fsPromises } from 'fs';
-import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import os from 'os';
 import { extractProjectDirectory } from '../projects.js';
 import { detectTaskMasterMCPServer } from '../utils/mcp-detector.js';
 import { broadcastTaskMasterProjectUpdate, broadcastTaskMasterTasksUpdate } from '../utils/taskmaster-websocket.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 const router = express.Router();
+const PIPELINE_DIR = '.pipeline';
+const LEGACY_TASKMASTER_DIR = '.taskmaster';
+const DEFAULT_TASKS_TAG = 'master';
+const DEFAULT_RESEARCH_BRIEF_FILENAME = 'research_brief.json';
+const DEFAULT_MAX_TASKS = 30;
+const STAGE_ORDER = ['ideation', 'experiment', 'publication'];
+const STAGE_LABELS = {
+    ideation: 'Ideation',
+    experiment: 'Experiment',
+    publication: 'Publication',
+};
+const STAGE_PROMPT_HINTS = {
+    ideation: 'Clarify thesis, scope boundaries, and evidence framing before execution.',
+    experiment: 'Turn assumptions into an executable protocol with measurable validation criteria.',
+    publication: 'Convert outcomes into a coherent manuscript narrative with concrete submission artifacts.',
+};
+const DEFAULT_STAGE_SKILL_MAP = {
+    ideation: {
+        base: ['inno-idea-generation', 'inno-research-orchestrator', 'inno-prepare-resources'],
+        byTaskType: {
+            analysis: ['inno-research-orchestrator'],
+            exploration: ['inno-idea-generation', 'inno-code-survey'],
+        },
+    },
+    experiment: {
+        base: ['inno-code-survey', 'inno-experiment-dev', 'inno-experiment-analysis'],
+        byTaskType: {
+            implementation: ['inno-experiment-dev'],
+            analysis: ['inno-experiment-analysis'],
+            exploration: ['inno-code-survey'],
+        },
+    },
+    publication: {
+        base: ['inno-paper-writing', 'inno-reference-audit', 'inno-rclone-to-overleaf'],
+        byTaskType: {
+            writing: ['inno-paper-writing'],
+            analysis: ['inno-reference-audit'],
+        },
+    },
+};
+const DEFAULT_BRIEF_SECTIONS = {
+    ideation: {
+        research_goal: '',
+        problem_framing: '',
+        evidence_plan: '',
+        success_criteria: [],
+    },
+    experiment: {
+        hypothesis_or_validation_goal: '',
+        dataset_or_data_source: '',
+        method_or_protocol: '',
+        evaluation_plan: '',
+    },
+    publication: {
+        paper_outline: '',
+        figures_tables_plan: '',
+        artifact_plan: '',
+        submission_checklist: [],
+    },
+};
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SKILLS_DIR = path.resolve(__dirname, '..', '..', 'skills');
+const STAGE_SKILL_MAP_PATH = path.join(SKILLS_DIR, 'stage-skill-map.json');
+let cachedStageSkillMap = null;
+let cachedStageSkillMapMtimeMs = null;
+function normalizeStageSkillMap(rawMap = {}) {
+    const normalized = {};
+    STAGE_ORDER.forEach((stage) => {
+        const source = rawMap?.[stage] || {};
+        normalized[stage] = {
+            base: Array.isArray(source.base) ? source.base.map((item) => String(item || '').trim()).filter(Boolean) : [],
+            byTaskType: source.byTaskType && typeof source.byTaskType === 'object'
+                ? Object.fromEntries(
+                    Object.entries(source.byTaskType).map(([taskType, skills]) => [
+                        String(taskType || '').trim(),
+                        Array.isArray(skills) ? skills.map((item) => String(item || '').trim()).filter(Boolean) : [],
+                    ]),
+                )
+                : {},
+        };
+        if (normalized[stage].base.length === 0) {
+            normalized[stage].base = DEFAULT_STAGE_SKILL_MAP[stage]?.base || [];
+        }
+    });
+    return normalized;
+}
+
+function getStageSkillMap() {
+    try {
+        const stats = fs.statSync(STAGE_SKILL_MAP_PATH);
+        if (
+            cachedStageSkillMap &&
+            typeof cachedStageSkillMapMtimeMs === 'number' &&
+            cachedStageSkillMapMtimeMs === stats.mtimeMs
+        ) {
+            return cachedStageSkillMap;
+        }
+
+        const content = fs.readFileSync(STAGE_SKILL_MAP_PATH, 'utf8');
+        const parsed = JSON.parse(content);
+        cachedStageSkillMap = normalizeStageSkillMap(parsed);
+        cachedStageSkillMapMtimeMs = stats.mtimeMs;
+        return cachedStageSkillMap;
+    } catch (error) {
+        if (!cachedStageSkillMap) {
+            cachedStageSkillMap = normalizeStageSkillMap(DEFAULT_STAGE_SKILL_MAP);
+        }
+        return cachedStageSkillMap;
+    }
+}
+
+function buildDefaultBriefPipeline(stageSkillMap) {
+    const map = stageSkillMap || getStageSkillMap();
+    return {
+        version: '1.1',
+        mode: 'idea',
+        stages: {
+            ideation: {
+                required_elements: [
+                    'sections.ideation.research_goal',
+                    'sections.ideation.problem_framing',
+                ],
+                optional_elements: [
+                    'sections.ideation.evidence_plan',
+                    'sections.ideation.success_criteria',
+                ],
+                quality_gate: [
+                    'At least one clear research direction is defined',
+                    'Problem framing and expected value are specific',
+                ],
+                task_blueprints: [
+                    {
+                        id: 'ideation_generate_candidates',
+                        title: 'Generate and compare candidate research directions',
+                        description: 'Produce multiple candidate directions and compare novelty, feasibility, and expected impact.',
+                        taskType: 'exploration',
+                    },
+                    {
+                        id: 'ideation_select_direction',
+                        title: 'Select one direction with explicit rationale',
+                        description: 'Pick one direction and document tradeoffs and scope boundaries.',
+                        taskType: 'analysis',
+                    },
+                ],
+                recommended_skills: map.ideation.base,
+            },
+            experiment: {
+                required_elements: [
+                    'sections.experiment.hypothesis_or_validation_goal',
+                    'sections.experiment.method_or_protocol',
+                    'sections.experiment.evaluation_plan',
+                ],
+                optional_elements: [
+                    'sections.experiment.dataset_or_data_source',
+                ],
+                quality_gate: [
+                    'Validation goal can be measured objectively',
+                    'Method and evaluation protocol are executable',
+                ],
+                task_blueprints: [
+                    {
+                        id: 'experiment_define_protocol',
+                        title: 'Define executable experiment protocol',
+                        description: 'Translate method and evaluation plan into executable steps and checkpoints.',
+                        taskType: 'implementation',
+                    },
+                    {
+                        id: 'experiment_run_analysis',
+                        title: 'Run baseline analysis and record outcomes',
+                        description: 'Execute baseline validation and summarize key findings and gaps.',
+                        taskType: 'analysis',
+                    },
+                ],
+                recommended_skills: map.experiment.base,
+            },
+            publication: {
+                required_elements: [
+                    'sections.publication.paper_outline',
+                    'sections.publication.submission_checklist',
+                ],
+                optional_elements: [
+                    'sections.publication.figures_tables_plan',
+                    'sections.publication.artifact_plan',
+                ],
+                quality_gate: [
+                    'Contribution narrative and structure are coherent',
+                    'Submission checklist and artifacts are complete',
+                ],
+                task_blueprints: [
+                    {
+                        id: 'publication_outline_to_draft',
+                        title: 'Expand outline into draft sections',
+                        description: 'Convert paper outline into structured draft sections with claim-evidence alignment.',
+                        taskType: 'writing',
+                    },
+                    {
+                        id: 'publication_finalize_artifacts',
+                        title: 'Finalize figures, tables, and artifacts',
+                        description: 'Prepare final visuals and reproducibility artifacts required for submission.',
+                        taskType: 'writing',
+                    },
+                ],
+                recommended_skills: map.publication.base,
+            },
+        },
+    };
+}
+const TEMPLATES_DIR = path.resolve(__dirname, '..', 'taskmaster-templates');
+const DEFAULT_PIPELINE_CONFIG = {
+    version: '1.0',
+    provider: 'vibelab-web',
+    initializedAt: new Date().toISOString(),
+};
+let cachedTemplates = null;
+
+function getPipelinePaths(projectPath) {
+    const pipelineRoot = path.join(projectPath, PIPELINE_DIR);
+    return {
+        root: pipelineRoot,
+        tasksDir: path.join(pipelineRoot, 'tasks'),
+        tasksFile: path.join(pipelineRoot, 'tasks', 'tasks.json'),
+        docsDir: path.join(pipelineRoot, 'docs'),
+        configFile: path.join(pipelineRoot, 'config.json'),
+        legacyRoot: path.join(projectPath, LEGACY_TASKMASTER_DIR),
+    };
+}
+
+async function pathExists(filePath) {
+    try {
+        await fsPromises.access(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function migrateLegacyTaskmasterIfNeeded(projectPath) {
+    const paths = getPipelinePaths(projectPath);
+    const hasPipeline = await pathExists(paths.root);
+    const hasLegacy = await pathExists(paths.legacyRoot);
+    if (hasPipeline || !hasLegacy) {
+        return;
+    }
+
+    await fsPromises.cp(paths.legacyRoot, paths.root, { recursive: true, force: false });
+}
+
+async function ensurePipelineInitialized(projectPath) {
+    const paths = getPipelinePaths(projectPath);
+    await migrateLegacyTaskmasterIfNeeded(projectPath);
+    await fsPromises.mkdir(paths.tasksDir, { recursive: true });
+    await fsPromises.mkdir(paths.docsDir, { recursive: true });
+
+    if (!(await pathExists(paths.configFile))) {
+        await fsPromises.writeFile(paths.configFile, `${JSON.stringify(DEFAULT_PIPELINE_CONFIG, null, 2)}\n`, 'utf8');
+    }
+
+    if (!(await pathExists(paths.tasksFile))) {
+        const initial = { [DEFAULT_TASKS_TAG]: { tasks: [] } };
+        await fsPromises.writeFile(paths.tasksFile, `${JSON.stringify(initial, null, 2)}\n`, 'utf8');
+    }
+
+    return paths;
+}
+
+function extractTasksFromData(tasksData) {
+    let currentTag = DEFAULT_TASKS_TAG;
+    let tasks = [];
+
+    if (Array.isArray(tasksData)) {
+        tasks = tasksData;
+    } else if (tasksData?.tasks) {
+        tasks = tasksData.tasks;
+    } else if (tasksData && typeof tasksData === 'object') {
+        if (tasksData[currentTag]?.tasks) {
+            tasks = tasksData[currentTag].tasks;
+        } else if (tasksData.master?.tasks) {
+            tasks = tasksData.master.tasks;
+            currentTag = 'master';
+        } else {
+            const firstTag = Object.keys(tasksData).find((key) => Array.isArray(tasksData[key]?.tasks));
+            if (firstTag) {
+                currentTag = firstTag;
+                tasks = tasksData[firstTag].tasks;
+            }
+        }
+    }
+
+    return { tasks: Array.isArray(tasks) ? tasks : [], currentTag };
+}
+
+function normalizeTask(task) {
+    const now = new Date().toISOString();
+    const stage = normalizeStageName(task.stage);
+    return {
+        id: task.id,
+        title: task.title || 'Untitled Task',
+        description: task.description || '',
+        status: normalizeTaskStatus(task.status),
+        priority: task.priority || 'medium',
+        dependencies: Array.isArray(task.dependencies) ? task.dependencies : [],
+        createdAt: task.createdAt || task.created || now,
+        updatedAt: task.updatedAt || task.updated || now,
+        details: task.details || '',
+        testStrategy: task.testStrategy || task.test_strategy || '',
+        subtasks: Array.isArray(task.subtasks) ? task.subtasks : [],
+        stage: stage || undefined,
+        taskType: task.taskType || 'implementation',
+        inputsNeeded: Array.isArray(task.inputsNeeded) ? task.inputsNeeded.filter(Boolean) : [],
+        suggestedSkills: Array.isArray(task.suggestedSkills) ? task.suggestedSkills.filter(Boolean) : [],
+        sourceBlueprintId: task.sourceBlueprintId || '',
+        nextActionPrompt: typeof task.nextActionPrompt === 'string' ? task.nextActionPrompt : '',
+    };
+}
+
+function normalizeTaskStatus(status) {
+    const raw = String(status || '').trim().toLowerCase();
+    if (!raw) return 'pending';
+    if (raw === 'completed' || raw === 'complete') return 'done';
+    if (raw === 'in_progress' || raw === 'inprogress') return 'in-progress';
+    if (raw === 'todo' || raw === 'open') return 'pending';
+    return raw;
+}
+
+async function readTasksFile(tasksFilePath) {
+    const content = await fsPromises.readFile(tasksFilePath, 'utf8');
+    const parsed = JSON.parse(content);
+    const { tasks, currentTag } = extractTasksFromData(parsed);
+    return {
+        raw: parsed,
+        currentTag,
+        tasks: tasks.map(normalizeTask),
+    };
+}
+
+async function writeTasksFile(tasksFilePath, tasks, currentTag = DEFAULT_TASKS_TAG) {
+    const payload = { [currentTag]: { tasks } };
+    await fsPromises.writeFile(tasksFilePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+}
+
+function generateTaskId(tasks) {
+    const numericIds = tasks
+        .map((task) => Number(task.id))
+        .filter((value) => Number.isFinite(value));
+    if (numericIds.length === 0) {
+        return 1;
+    }
+    return Math.max(...numericIds) + 1;
+}
+
+function splitPromptToTitle(prompt) {
+    const cleaned = String(prompt || '').replace(/\s+/g, ' ').trim();
+    if (!cleaned) {
+        return 'Untitled Task';
+    }
+    return cleaned.length > 120 ? `${cleaned.slice(0, 117)}...` : cleaned;
+}
+
+function assignPath(target, dottedPath, value) {
+    const keys = String(dottedPath || '').split('.').filter(Boolean);
+    if (keys.length === 0) return;
+    let cursor = target;
+    for (let i = 0; i < keys.length - 1; i += 1) {
+        const key = keys[i];
+        if (!cursor[key] || typeof cursor[key] !== 'object' || Array.isArray(cursor[key])) {
+            cursor[key] = {};
+        }
+        cursor = cursor[key];
+    }
+    cursor[keys[keys.length - 1]] = value;
+}
+
+function toTaskCandidate(raw) {
+    const value = String(raw || '').replace(/\s+/g, ' ').trim();
+    if (!value) return null;
+    return value.length > 180 ? `${value.slice(0, 177)}...` : value;
+}
+
+function isPlaceholderLikeValue(value = '') {
+    const normalized = String(value).trim().toLowerCase();
+    if (!normalized) return true;
+    const blocked = new Set([
+        'none', 'null', 'n/a', 'na', 'todo', 'tbd', 'unknown', 'not sure', '-',
+        '[]', '{}', 'placeholder',
+    ]);
+    return blocked.has(normalized);
+}
+
+function buildFallbackTaskCandidates(briefData = {}) {
+    const title = String(briefData?.meta?.title || '').trim();
+    const target = title ? ` for "${title}"` : '';
+    return [
+        `Finalize Ideation section${target}: clarify research goal, framing, and evidence plan.`,
+        `Define Experiment section${target}: specify validation goal, protocol, and evaluation plan.`,
+        `Prepare Publication section${target}: draft paper outline, figures/tables plan, and submission checklist.`,
+    ];
+}
+
+function buildPipelineSkeletonCandidates(briefData = {}) {
+    const title = String(briefData?.meta?.title || '').trim();
+    const target = title ? ` (${title})` : '';
+    return [
+        `Ideation: clarify problem framing and research goal${target}.`,
+        `Ideation: collect key evidence and references${target}.`,
+        `Ideation: define measurable success criteria${target}.`,
+        `Experiment: define validation hypothesis and evaluation criteria${target}.`,
+        `Experiment: prepare data source and method/protocol plan${target}.`,
+        `Experiment: execute baseline validation and analyze results${target}.`,
+        `Publication: draft paper outline and contribution boundaries${target}.`,
+        `Publication: prepare figures/tables and artifact appendix${target}.`,
+        `Publication: complete submission checklist and final review${target}.`,
+    ];
+}
+
+function parseBriefJsonToTaskCandidates(briefData = {}) {
+    const candidates = [];
+    const sectionOrder = ['ideation', 'experiment', 'publication'];
+    const sectionData = briefData?.sections && typeof briefData.sections === 'object'
+        ? briefData.sections
+        : {};
+
+    sectionOrder.forEach((sectionName) => {
+        const fields = sectionData[sectionName];
+        if (!fields || typeof fields !== 'object') return;
+        Object.values(fields).forEach((value) => {
+            if (Array.isArray(value)) {
+                value.forEach((item) => {
+                    const normalized = toTaskCandidate(item);
+                    if (normalized) candidates.push(normalized);
+                });
+                return;
+            }
+            const normalized = toTaskCandidate(value);
+            if (normalized && !isPlaceholderLikeValue(normalized)) candidates.push(normalized);
+        });
+    });
+
+    const dynamic = [...new Set(candidates)];
+    const skeleton = buildPipelineSkeletonCandidates(briefData);
+    const fallback = dynamic.length > 0 ? [] : buildFallbackTaskCandidates(briefData);
+    return [...new Set([...skeleton, ...dynamic, ...fallback])];
+}
+
+function inferStageFromCandidate(text = '') {
+    const value = String(text || '').toLowerCase();
+    if (value.includes('ideation')) return 'ideation';
+    if (value.includes('experiment') || value.includes('validation') || value.includes('baseline')) return 'experiment';
+    if (value.includes('publication') || value.includes('paper') || value.includes('submission')) return 'publication';
+    return null;
+}
+
+function normalizeStageName(stage) {
+    const value = String(stage || '').trim().toLowerCase();
+    if (value === 'ideation' || value === 'experiment' || value === 'publication') {
+        return value;
+    }
+    return null;
+}
+
+function titleFromBlueprintId(sourceBlueprintId = '', stage = '') {
+    const cleaned = String(sourceBlueprintId || '').replace(/[_-]+/g, ' ').trim();
+    const title = cleaned
+        ? cleaned.replace(/\b\w/g, (ch) => ch.toUpperCase())
+        : `Execute ${STAGE_LABELS[stage] || 'Pipeline'} task`;
+    return title.length > 120 ? `${title.slice(0, 117)}...` : title;
+}
+
+function getValueByPath(target, dottedPath) {
+    if (!target || typeof target !== 'object') return undefined;
+    const keys = String(dottedPath || '').split('.').filter(Boolean);
+    if (keys.length === 0) return undefined;
+    let cursor = target;
+    for (const key of keys) {
+        if (cursor === null || cursor === undefined || typeof cursor !== 'object') {
+            return undefined;
+        }
+        cursor = cursor[key];
+    }
+    return cursor;
+}
+
+function hasMeaningfulValue(value) {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string') return !isPlaceholderLikeValue(value);
+    if (Array.isArray(value)) return value.some((item) => hasMeaningfulValue(item));
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return true;
+}
+
+function computeMissingElements(briefData = {}, requiredElements = []) {
+    if (!Array.isArray(requiredElements)) return [];
+    return requiredElements
+        .map((pathName) => String(pathName || '').trim())
+        .filter(Boolean)
+        .filter((pathName) => !hasMeaningfulValue(getValueByPath(briefData, pathName)));
+}
+
+function ensureArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    return [value];
+}
+
+function dedupeStringList(values = []) {
+    return [...new Set(values.map((item) => String(item || '').trim()).filter(Boolean))];
+}
+
+function formatInputValue(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') {
+        return value.trim();
+    }
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => String(item ?? '').trim())
+            .filter(Boolean)
+            .join('\n');
+    }
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return String(value);
+    }
+}
+
+function toTitleCase(text = '') {
+    return String(text || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
+function formatFieldDisplayName(pathName = '') {
+    const cleaned = String(pathName || '').trim();
+    if (!cleaned) return 'Required Field';
+    const parts = cleaned.split('.').filter(Boolean);
+    const fieldKey = parts[parts.length - 1] || cleaned;
+    const stageKey = parts[1] && STAGE_LABELS[parts[1]] ? STAGE_LABELS[parts[1]] : '';
+    const fieldLabel = toTitleCase(fieldKey.replace(/[_-]+/g, ' '));
+    return stageKey ? `${stageKey} ${fieldLabel}` : fieldLabel;
+}
+
+function resolveTaskSkills(stage, taskType, stageConfiguredSkills = [], blueprintSkills = []) {
+    const stageMap = getStageSkillMap()[stage] || {};
+    const fromStageBase = ensureArray(stageMap.base);
+    const fromTaskType = ensureArray(stageMap.byTaskType?.[taskType]);
+    return dedupeStringList([
+        ...ensureArray(stageConfiguredSkills),
+        ...fromStageBase,
+        ...fromTaskType,
+        ...ensureArray(blueprintSkills),
+    ]);
+}
+
+function buildTaskNextActionPrompt(task = {}, stageConfig = {}, stage = '', briefData = {}) {
+    const lines = [
+        `Task: ${task.title || 'Untitled Task'}`,
+        `Stage: ${STAGE_LABELS[stage] || stage || 'Unknown'}`,
+    ];
+
+    const requiredInputs = dedupeStringList(Array.isArray(task.inputsNeeded) ? task.inputsNeeded : []);
+    const missingInputs = [];
+    const providedInputs = [];
+    requiredInputs.forEach((pathName) => {
+        const value = getValueByPath(briefData, pathName);
+        if (hasMeaningfulValue(value)) {
+            providedInputs.push({ pathName, value: formatInputValue(value) });
+        } else {
+            missingInputs.push(pathName);
+        }
+    });
+
+    if (missingInputs.length > 0) {
+        lines.push(`Missing inputs: ${missingInputs.join(', ')}`);
+    }
+    if (providedInputs.length === 1) {
+        lines.push(`User inputs: "${providedInputs[0].value}"`);
+    } else if (providedInputs.length > 1) {
+        lines.push('User inputs:');
+        providedInputs.forEach((entry) => {
+            lines.push(`- ${entry.pathName}: "${entry.value}"`);
+        });
+    }
+
+    const suggestedSkills = Array.isArray(task.suggestedSkills) ? task.suggestedSkills : [];
+    if (suggestedSkills.length > 0) {
+        lines.push(`Suggested skills: ${suggestedSkills.join(', ')}`);
+    }
+
+    const qualityGate = Array.isArray(stageConfig.quality_gate) ? stageConfig.quality_gate : [];
+    if (qualityGate.length > 0 && task.taskType === 'analysis') {
+        lines.push(`Quality gate checklist: ${qualityGate.join(' | ')}`);
+    }
+
+    if (STAGE_PROMPT_HINTS[stage]) {
+        lines.push(`Stage guidance: ${STAGE_PROMPT_HINTS[stage]}`);
+    }
+
+    if (providedInputs.length > 0) {
+        lines.push('Please produce a concrete next step plan and execution output. If user inputs are provided, polish and make them concrete, then write updates back to .pipeline/docs/research_brief.json.');
+    } else {
+        lines.push('Please produce a concrete next step plan and execution output. If key inputs are missing, propose precise placeholders and write updates back to .pipeline/docs/research_brief.json.');
+    }
+    return lines.join('\n');
+}
+
+function instantiatePipelineTasksFromBrief(briefData = {}, numTasks = DEFAULT_MAX_TASKS) {
+    const pipelineStages = briefData?.pipeline?.stages && typeof briefData.pipeline.stages === 'object'
+        ? briefData.pipeline.stages
+        : null;
+    if (!pipelineStages) return null;
+
+    const now = new Date().toISOString();
+    const generated = [];
+    const maxTasks = Number.isFinite(Number(numTasks)) && Number(numTasks) > 0 ? Number(numTasks) : DEFAULT_MAX_TASKS;
+
+    for (const stage of STAGE_ORDER) {
+        const stageConfig = pipelineStages?.[stage];
+        if (!stageConfig || typeof stageConfig !== 'object') continue;
+
+        const stageSkills = resolveTaskSkills(stage, '', stageConfig.recommended_skills, []);
+        const stageRequiredElements = dedupeStringList(ensureArray(stageConfig.required_elements));
+        const missingElements = computeMissingElements(briefData, stageConfig.required_elements);
+        const stageBlueprints = ensureArray(stageConfig.task_blueprints);
+
+        stageBlueprints.forEach((blueprintNode, index) => {
+            const blueprint = typeof blueprintNode === 'string'
+                ? { id: blueprintNode }
+                : (blueprintNode && typeof blueprintNode === 'object' ? blueprintNode : { id: `${stage}_task_${index + 1}` });
+            const sourceBlueprintId = String(blueprint.id || `${stage}_task_${index + 1}`);
+            const task = normalizeTask({
+                id: generated.length + 1,
+                title: blueprint.title || titleFromBlueprintId(sourceBlueprintId, stage),
+                description: blueprint.description || `Execute ${STAGE_LABELS[stage] || stage} task from pipeline blueprint.`,
+                status: 'pending',
+                priority: blueprint.priority || 'medium',
+                dependencies: Array.isArray(blueprint.dependencies) ? blueprint.dependencies : [],
+                createdAt: now,
+                updatedAt: now,
+                stage,
+                taskType: blueprint.taskType || 'implementation',
+                inputsNeeded: dedupeStringList([
+                    ...ensureArray(blueprint.inputsNeeded),
+                    ...stageRequiredElements,
+                ]),
+                suggestedSkills: resolveTaskSkills(stage, blueprint.taskType || 'implementation', stageSkills, blueprint.recommended_skills),
+                sourceBlueprintId,
+                nextActionPrompt: blueprint.nextActionPrompt || '',
+            });
+            task.nextActionPrompt = task.nextActionPrompt || buildTaskNextActionPrompt(task, stageConfig, stage, briefData);
+            generated.push(task);
+        });
+
+        stageRequiredElements.forEach((requiredPath) => {
+            const value = getValueByPath(briefData, requiredPath);
+            const hasValue = hasMeaningfulValue(value);
+            const fieldDisplayName = formatFieldDisplayName(requiredPath);
+            const task = normalizeTask({
+                id: generated.length + 1,
+                title: hasValue ? `Refine ${fieldDisplayName}` : `Define ${fieldDisplayName}`,
+                description: hasValue
+                    ? `The required field "${requiredPath}" exists but may still be vague. Refine it into concrete, testable language.`
+                    : `The required field "${requiredPath}" is missing or unclear. Clarify it before stage completion.`,
+                status: 'pending',
+                priority: hasValue ? 'medium' : 'high',
+                dependencies: [],
+                createdAt: now,
+                updatedAt: now,
+                stage,
+                taskType: hasValue ? 'analysis' : 'exploration',
+                inputsNeeded: [requiredPath],
+                suggestedSkills: resolveTaskSkills(stage, hasValue ? 'analysis' : 'exploration', stageSkills, []),
+                sourceBlueprintId: hasValue ? `${stage}.refine.${requiredPath}` : `${stage}.missing.${requiredPath}`,
+                nextActionPrompt: '',
+            });
+            task.nextActionPrompt = buildTaskNextActionPrompt(task, stageConfig, stage, briefData);
+            generated.push(task);
+        });
+
+        const qualityGate = Array.isArray(stageConfig.quality_gate)
+            ? stageConfig.quality_gate.map((item) => String(item || '').trim()).filter(Boolean)
+            : [];
+        if (qualityGate.length > 0) {
+            const task = normalizeTask({
+                id: generated.length + 1,
+                title: `Review ${STAGE_LABELS[stage] || stage} quality gate before moving forward`,
+                description: `Complete and verify ${STAGE_LABELS[stage] || stage} quality gate criteria.`,
+                status: 'pending',
+                priority: 'medium',
+                dependencies: [],
+                createdAt: now,
+                updatedAt: now,
+                stage,
+                taskType: 'analysis',
+                inputsNeeded: [],
+                suggestedSkills: resolveTaskSkills(stage, 'analysis', stageSkills, []),
+                sourceBlueprintId: `${stage}.quality_gate`,
+                nextActionPrompt: '',
+            });
+            task.nextActionPrompt = buildTaskNextActionPrompt(task, stageConfig, stage, briefData);
+            generated.push(task);
+        }
+    }
+
+    const normalized = generated.slice(0, maxTasks).map((task, index) => normalizeTask({
+        ...task,
+        id: index + 1,
+    }));
+
+    return normalized.length > 0 ? normalized : null;
+}
+
+function computeNextGuidance(tasks = []) {
+    const allTasks = Array.isArray(tasks) ? tasks : [];
+    const doneIds = new Set(
+        allTasks
+            .filter((task) => String(task.status || '').toLowerCase() === 'done')
+            .map((task) => String(task.id)),
+    );
+
+    const inProgress = allTasks.find((task) => String(task.status || '').toLowerCase() === 'in-progress') || null;
+    if (inProgress) {
+        return {
+            nextTask: inProgress,
+            whyNext: 'This task is already in progress and should be finished first.',
+            requiredInputs: Array.isArray(inProgress.inputsNeeded) ? inProgress.inputsNeeded : [],
+            suggestedSkills: Array.isArray(inProgress.suggestedSkills) ? inProgress.suggestedSkills : [],
+            nextActionPrompt: inProgress.nextActionPrompt || '',
+        };
+    }
+
+    const pendingTasks = allTasks.filter((task) => String(task.status || '').toLowerCase() === 'pending');
+    if (pendingTasks.length === 0) {
+        return {
+            nextTask: null,
+            whyNext: 'No pending or in-progress tasks available.',
+            requiredInputs: [],
+            suggestedSkills: [],
+            nextActionPrompt: '',
+        };
+    }
+
+    const readyTask = pendingTasks.find((task) => {
+        const deps = Array.isArray(task.dependencies) ? task.dependencies.map((dep) => String(dep)) : [];
+        return deps.every((dep) => doneIds.has(dep));
+    }) || pendingTasks[0];
+
+    const blockedDependencies = Array.isArray(readyTask.dependencies)
+        ? readyTask.dependencies.filter((dep) => !doneIds.has(String(dep)))
+        : [];
+    const whyNext = blockedDependencies.length === 0
+        ? 'This is the first actionable pending task based on dependency order.'
+        : `This pending task is recommended, but it still references unresolved dependencies: ${blockedDependencies.join(', ')}`;
+
+    return {
+        nextTask: readyTask,
+        whyNext,
+        requiredInputs: Array.isArray(readyTask.inputsNeeded) ? readyTask.inputsNeeded : [],
+        suggestedSkills: Array.isArray(readyTask.suggestedSkills) ? readyTask.suggestedSkills : [],
+        nextActionPrompt: readyTask.nextActionPrompt || '',
+    };
+}
+
+function dedupeGeneratedTasks(existingTasks = [], generatedTasks = []) {
+    const signature = (task) => `${String(task.title || '').trim().toLowerCase()}|${String(task.description || '').trim().toLowerCase()}`;
+    const existingSignatures = new Set(existingTasks.map(signature));
+    return generatedTasks.filter((task) => {
+        const key = signature(task);
+        if (existingSignatures.has(key)) return false;
+        existingSignatures.add(key);
+        return true;
+    });
+}
 
 /**
  * Check if TaskMaster CLI is installed globally
  * @returns {Promise<Object>} Installation status result
  */
 async function checkTaskMasterInstallation() {
-    return new Promise((resolve) => {
-        // Check if task-master command is available
-        const child = spawn('which', ['task-master'], { 
-            stdio: ['ignore', 'pipe', 'pipe'],
-            shell: true 
-        });
-        
-        let output = '';
-        let errorOutput = '';
-        
-        child.stdout.on('data', (data) => {
-            output += data.toString();
-        });
-        
-        child.stderr.on('data', (data) => {
-            errorOutput += data.toString();
-        });
-        
-        child.on('close', (code) => {
-            if (code === 0 && output.trim()) {
-                // TaskMaster is installed, get version
-                const versionChild = spawn('task-master', ['--version'], { 
-                    stdio: ['ignore', 'pipe', 'pipe'],
-                    shell: true 
-                });
-                
-                let versionOutput = '';
-                
-                versionChild.stdout.on('data', (data) => {
-                    versionOutput += data.toString();
-                });
-                
-                versionChild.on('close', (versionCode) => {
-                    resolve({
-                        isInstalled: true,
-                        installPath: output.trim(),
-                        version: versionCode === 0 ? versionOutput.trim() : 'unknown',
-                        reason: null
-                    });
-                });
-                
-                versionChild.on('error', () => {
-                    resolve({
-                        isInstalled: true,
-                        installPath: output.trim(),
-                        version: 'unknown',
-                        reason: null
-                    });
-                });
-            } else {
-                resolve({
-                    isInstalled: false,
-                    installPath: null,
-                    version: null,
-                    reason: 'TaskMaster CLI not found in PATH'
-                });
-            }
-        });
-        
-        child.on('error', (error) => {
-            resolve({
-                isInstalled: false,
-                installPath: null,
-                version: null,
-                reason: `Error checking installation: ${error.message}`
-            });
-        });
-    });
+    return {
+        isInstalled: true,
+        installPath: PIPELINE_DIR,
+        version: 'web-native',
+        reason: null,
+    };
 }
 
 /**
- * Detect .taskmaster folder presence in a given project directory
+ * Detect .pipeline folder presence in a given project directory
  * @param {string} projectPath - Absolute path to project directory
  * @returns {Promise<Object>} Detection result with status and metadata
  */
 async function detectTaskMasterFolder(projectPath) {
     try {
-        const taskMasterPath = path.join(projectPath, '.taskmaster');
+        await migrateLegacyTaskmasterIfNeeded(projectPath);
+        const taskMasterPath = getPipelinePaths(projectPath).root;
         
-        // Check if .taskmaster directory exists
+        // Check if .pipeline directory exists
         try {
             const stats = await fsPromises.stat(taskMasterPath);
             if (!stats.isDirectory()) {
                 return {
                     hasTaskmaster: false,
-                    reason: '.taskmaster exists but is not a directory'
+                    reason: '.pipeline exists but is not a directory'
                 };
             }
         } catch (error) {
             if (error.code === 'ENOENT') {
                 return {
                     hasTaskmaster: false,
-                    reason: '.taskmaster directory not found'
+                    reason: '.pipeline directory not found'
                 };
             }
             throw error;
@@ -131,6 +838,7 @@ async function detectTaskMasterFolder(projectPath) {
         // Check for key TaskMaster files
         const keyFiles = [
             'tasks/tasks.json',
+            'docs/research_brief.json',
             'config.json'
         ];
         
@@ -157,32 +865,21 @@ async function detectTaskMasterFolder(projectPath) {
                 const tasksPath = path.join(taskMasterPath, 'tasks/tasks.json');
                 const tasksContent = await fsPromises.readFile(tasksPath, 'utf8');
                 const tasksData = JSON.parse(tasksContent);
-                
-                // Handle both tagged and legacy formats
-                let tasks = [];
-                if (tasksData.tasks) {
-                    // Legacy format
-                    tasks = tasksData.tasks;
-                } else {
-                    // Tagged format - get tasks from all tags
-                    Object.values(tasksData).forEach(tagData => {
-                        if (tagData.tasks) {
-                            tasks = tasks.concat(tagData.tasks);
-                        }
-                    });
-                }
+                const { tasks } = extractTasksFromData(tasksData);
 
                 // Calculate task statistics
                 const stats = tasks.reduce((acc, task) => {
+                    const taskStatus = normalizeTaskStatus(task.status);
                     acc.total++;
-                    acc[task.status] = (acc[task.status] || 0) + 1;
+                    acc[taskStatus] = (acc[taskStatus] || 0) + 1;
                     
                     // Count subtasks
                     if (task.subtasks) {
                         task.subtasks.forEach(subtask => {
+                            const subtaskStatus = normalizeTaskStatus(subtask.status);
                             acc.subtotalTasks++;
                             acc.subtasks = acc.subtasks || {};
-                            acc.subtasks[subtask.status] = (acc.subtasks[subtask.status] || 0) + 1;
+                            acc.subtasks[subtaskStatus] = (acc.subtasks[subtaskStatus] || 0) + 1;
                         });
                     }
                     
@@ -215,9 +912,12 @@ async function detectTaskMasterFolder(projectPath) {
             }
         }
 
+        const hasResearchBrief = fileStatus['docs/research_brief.json'] === true;
+
         return {
             hasTaskmaster: true,
             hasEssentialFiles,
+            hasResearchBrief,
             files: fileStatus,
             metadata: taskMetadata,
             path: taskMasterPath
@@ -434,14 +1134,23 @@ router.get('/detect-all', async (req, res) => {
 router.post('/initialize/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
-        const { rules } = req.body; // Optional rule profiles
-        
-        // This will be implemented in a later subtask with CLI integration
-        res.status(501).json({
-            error: 'TaskMaster initialization not yet implemented',
-            message: 'This endpoint will execute task-master init via CLI in a future update',
+        let projectPath;
+        try {
+            projectPath = await extractProjectDirectory(projectName);
+        } catch (error) {
+            return res.status(404).json({
+                error: 'Project not found',
+                message: `Project "${projectName}" does not exist`
+            });
+        }
+
+        const paths = await ensurePipelineInitialized(projectPath);
+        res.json({
             projectName,
-            rules
+            projectPath,
+            pipelinePath: paths.root,
+            message: 'Pipeline initialized successfully',
+            timestamp: new Date().toISOString()
         });
         
     } catch (error) {
@@ -455,7 +1164,7 @@ router.post('/initialize/:projectName', async (req, res) => {
 
 /**
  * GET /api/taskmaster/next/:projectName
- * Get the next recommended task using task-master CLI
+ * Get the next recommended task from local pipeline tasks
  */
 router.get('/next/:projectName', async (req, res) => {
     try {
@@ -472,87 +1181,18 @@ router.get('/next/:projectName', async (req, res) => {
             });
         }
 
-        // Try to execute task-master next command
-        try {
-            const { spawn } = await import('child_process');
-            
-            const nextTaskCommand = spawn('task-master', ['next'], {
-                cwd: projectPath,
-                stdio: ['pipe', 'pipe', 'pipe']
-            });
+        const paths = await ensurePipelineInitialized(projectPath);
+        const { tasks } = await readTasksFile(paths.tasksFile);
+        const nextTask = tasks.find((task) => task.status === 'in-progress')
+            || tasks.find((task) => task.status === 'pending')
+            || null;
 
-            let stdout = '';
-            let stderr = '';
-
-            nextTaskCommand.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
-
-            nextTaskCommand.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
-
-            await new Promise((resolve, reject) => {
-                nextTaskCommand.on('close', (code) => {
-                    if (code === 0) {
-                        resolve();
-                    } else {
-                        reject(new Error(`task-master next failed with code ${code}: ${stderr}`));
-                    }
-                });
-
-                nextTaskCommand.on('error', (error) => {
-                    reject(error);
-                });
-            });
-
-            // Parse the output - task-master next usually returns JSON
-            let nextTaskData = null;
-            if (stdout.trim()) {
-                try {
-                    nextTaskData = JSON.parse(stdout);
-                } catch (parseError) {
-                    // If not JSON, treat as plain text
-                    nextTaskData = { message: stdout.trim() };
-                }
-            }
-
-            res.json({
-                projectName,
-                projectPath,
-                nextTask: nextTaskData,
-                timestamp: new Date().toISOString()
-            });
-
-        } catch (cliError) {
-            console.warn('Failed to execute task-master CLI:', cliError.message);
-            
-            // Fallback to loading tasks and finding next one locally
-            // Use localhost to bypass proxy for internal server-to-server calls
-            const tasksResponse = await fetch(`http://localhost:${process.env.PORT || 3001}/api/taskmaster/tasks/${encodeURIComponent(projectName)}`, {
-                headers: {
-                    'Authorization': req.headers.authorization
-                }
-            });
-
-            if (tasksResponse.ok) {
-                const tasksData = await tasksResponse.json();
-                const nextTask = tasksData.tasks?.find(task => 
-                    task.status === 'pending' || task.status === 'in-progress'
-                ) || null;
-
-                res.json({
-                    projectName,
-                    projectPath,
-                    nextTask,
-                    fallback: true,
-                    message: 'Used fallback method (CLI not available)',
-                    timestamp: new Date().toISOString()
-                });
-            } else {
-                throw new Error('Failed to load tasks via fallback method');
-            }
-        }
+        res.json({
+            projectName,
+            projectPath,
+            nextTask,
+            timestamp: new Date().toISOString(),
+        });
 
     } catch (error) {
         console.error('TaskMaster next task error:', error);
@@ -564,8 +1204,50 @@ router.get('/next/:projectName', async (req, res) => {
 });
 
 /**
+ * GET /api/taskmaster/next-guidance/:projectName
+ * Get next actionable task with guidance metadata for Chat handoff
+ */
+router.get('/next-guidance/:projectName', async (req, res) => {
+    try {
+        const { projectName } = req.params;
+        let projectPath;
+        try {
+            projectPath = await extractProjectDirectory(projectName);
+        } catch (error) {
+            return res.status(404).json({
+                error: 'Project not found',
+                message: `Project "${projectName}" does not exist`,
+            });
+        }
+
+        const paths = await ensurePipelineInitialized(projectPath);
+        const { tasks } = await readTasksFile(paths.tasksFile);
+        const guidance = computeNextGuidance(tasks);
+
+        res.json({
+            projectName,
+            projectPath,
+            nextTask: guidance.nextTask,
+            guidance: {
+                whyNext: guidance.whyNext,
+                requiredInputs: guidance.requiredInputs,
+                suggestedSkills: guidance.suggestedSkills,
+                nextActionPrompt: guidance.nextActionPrompt,
+            },
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('TaskMaster next-guidance error:', error);
+        res.status(500).json({
+            error: 'Failed to get next guidance',
+            message: error.message,
+        });
+    }
+});
+
+/**
  * GET /api/taskmaster/tasks/:projectName
- * Load actual tasks from .taskmaster/tasks/tasks.json
+ * Load actual tasks from .pipeline/tasks/tasks.json
  */
 router.get('/tasks/:projectName', async (req, res) => {
     try {
@@ -582,8 +1264,8 @@ router.get('/tasks/:projectName', async (req, res) => {
             });
         }
 
-        const taskMasterPath = path.join(projectPath, '.taskmaster');
-        const tasksFilePath = path.join(taskMasterPath, 'tasks', 'tasks.json');
+        const paths = await ensurePipelineInitialized(projectPath);
+        const tasksFilePath = paths.tasksFile;
 
         // Check if tasks file exists
         try {
@@ -598,51 +1280,7 @@ router.get('/tasks/:projectName', async (req, res) => {
 
         // Read and parse tasks file
         try {
-            const tasksContent = await fsPromises.readFile(tasksFilePath, 'utf8');
-            const tasksData = JSON.parse(tasksContent);
-            
-            let tasks = [];
-            let currentTag = 'master';
-            
-            // Handle both tagged and legacy formats
-            if (Array.isArray(tasksData)) {
-                // Legacy format
-                tasks = tasksData;
-            } else if (tasksData.tasks) {
-                // Simple format with tasks array
-                tasks = tasksData.tasks;
-            } else {
-                // Tagged format - get tasks from current tag or master
-                if (tasksData[currentTag] && tasksData[currentTag].tasks) {
-                    tasks = tasksData[currentTag].tasks;
-                } else if (tasksData.master && tasksData.master.tasks) {
-                    tasks = tasksData.master.tasks;
-                } else {
-                    // Get tasks from first available tag
-                    const firstTag = Object.keys(tasksData).find(key => 
-                        tasksData[key].tasks && Array.isArray(tasksData[key].tasks)
-                    );
-                    if (firstTag) {
-                        tasks = tasksData[firstTag].tasks;
-                        currentTag = firstTag;
-                    }
-                }
-            }
-
-            // Transform tasks to ensure all have required fields
-            const transformedTasks = tasks.map(task => ({
-                id: task.id,
-                title: task.title || 'Untitled Task',
-                description: task.description || '',
-                status: task.status || 'pending',
-                priority: task.priority || 'medium',
-                dependencies: task.dependencies || [],
-                createdAt: task.createdAt || task.created || new Date().toISOString(),
-                updatedAt: task.updatedAt || task.updated || new Date().toISOString(),
-                details: task.details || '',
-                testStrategy: task.testStrategy || task.test_strategy || '',
-                subtasks: task.subtasks || []
-            }));
+            const { tasks: transformedTasks, currentTag } = await readTasksFile(tasksFilePath);
 
             res.json({
                 projectName,
@@ -680,7 +1318,7 @@ router.get('/tasks/:projectName', async (req, res) => {
 
 /**
  * GET /api/taskmaster/prd/:projectName
- * List all PRD files in the project's .taskmaster/docs directory
+ * List all PRD files in the project's .pipeline/docs directory
  */
 router.get('/prd/:projectName', async (req, res) => {
     try {
@@ -697,7 +1335,8 @@ router.get('/prd/:projectName', async (req, res) => {
             });
         }
 
-        const docsPath = path.join(projectPath, '.taskmaster', 'docs');
+        const paths = await ensurePipelineInitialized(projectPath);
+        const docsPath = paths.docsDir;
         
         // Check if docs directory exists
         try {
@@ -706,7 +1345,7 @@ router.get('/prd/:projectName', async (req, res) => {
             return res.json({
                 projectName,
                 prdFiles: [],
-                message: 'No .taskmaster/docs directory found'
+                message: 'No .pipeline/docs directory found'
             });
         }
 
@@ -719,7 +1358,7 @@ router.get('/prd/:projectName', async (req, res) => {
                 const filePath = path.join(docsPath, file);
                 const stats = await fsPromises.stat(filePath);
                 
-                if (stats.isFile() && (file.endsWith('.txt') || file.endsWith('.md'))) {
+                if (stats.isFile() && (file.endsWith('.txt') || file.endsWith('.md') || file.endsWith('.json'))) {
                     prdFiles.push({
                         name: file,
                         path: path.relative(projectPath, filePath),
@@ -756,7 +1395,7 @@ router.get('/prd/:projectName', async (req, res) => {
 
 /**
  * POST /api/taskmaster/prd/:projectName
- * Create or update a PRD file in the project's .taskmaster/docs directory
+ * Create or update a PRD file in the project's .pipeline/docs directory
  */
 router.post('/prd/:projectName', async (req, res) => {
     try {
@@ -771,10 +1410,10 @@ router.post('/prd/:projectName', async (req, res) => {
         }
 
         // Validate filename
-        if (!fileName.match(/^[\w\-. ]+\.(txt|md)$/)) {
+        if (!fileName.match(/^[\w\-. ]+\.(txt|md|json)$/)) {
             return res.status(400).json({
                 error: 'Invalid filename',
-                message: 'Filename must end with .txt or .md and contain only alphanumeric characters, spaces, dots, and dashes'
+                message: 'Filename must end with .txt, .md, or .json and contain only alphanumeric characters, spaces, dots, and dashes'
             });
         }
 
@@ -789,7 +1428,8 @@ router.post('/prd/:projectName', async (req, res) => {
             });
         }
 
-        const docsPath = path.join(projectPath, '.taskmaster', 'docs');
+        const paths = await ensurePipelineInitialized(projectPath);
+        const docsPath = paths.docsDir;
         const filePath = path.join(docsPath, fileName);
 
         // Ensure docs directory exists
@@ -858,7 +1498,8 @@ router.get('/prd/:projectName/:fileName', async (req, res) => {
             });
         }
 
-        const filePath = path.join(projectPath, '.taskmaster', 'docs', fileName);
+        const paths = await ensurePipelineInitialized(projectPath);
+        const filePath = path.join(paths.docsDir, fileName);
         
         // Check if file exists
         try {
@@ -923,7 +1564,8 @@ router.delete('/prd/:projectName/:fileName', async (req, res) => {
             });
         }
 
-        const filePath = path.join(projectPath, '.taskmaster', 'docs', fileName);
+        const paths = await ensurePipelineInitialized(projectPath);
+        const filePath = path.join(paths.docsDir, fileName);
         
         // Check if file exists
         try {
@@ -983,66 +1625,22 @@ router.post('/init/:projectName', async (req, res) => {
             });
         }
 
-        // Check if TaskMaster is already initialized
-        const taskMasterPath = path.join(projectPath, '.taskmaster');
-        try {
-            await fsPromises.access(taskMasterPath, fs.constants.F_OK);
-            return res.status(400).json({
-                error: 'TaskMaster already initialized',
-                message: 'TaskMaster is already configured for this project'
-            });
-        } catch (error) {
-            // Directory doesn't exist, we can proceed
+        const paths = await ensurePipelineInitialized(projectPath);
+        if (req.app.locals.wss) {
+            broadcastTaskMasterProjectUpdate(
+                req.app.locals.wss,
+                projectName,
+                { hasTaskmaster: true, status: 'initialized', path: paths.root }
+            );
         }
 
-        // Run taskmaster init command
-        const initProcess = spawn('npx', ['task-master', 'init'], {
-            cwd: projectPath,
-            stdio: ['pipe', 'pipe', 'pipe']
+        res.json({
+            projectName,
+            projectPath,
+            pipelinePath: paths.root,
+            message: 'Pipeline initialized successfully',
+            timestamp: new Date().toISOString(),
         });
-
-        let stdout = '';
-        let stderr = '';
-
-        initProcess.stdout.on('data', (data) => {
-            stdout += data.toString();
-        });
-
-        initProcess.stderr.on('data', (data) => {
-            stderr += data.toString();
-        });
-
-        initProcess.on('close', (code) => {
-            if (code === 0) {
-                // Broadcast TaskMaster project update via WebSocket
-                if (req.app.locals.wss) {
-                    broadcastTaskMasterProjectUpdate(
-                        req.app.locals.wss, 
-                        projectName, 
-                        { hasTaskmaster: true, status: 'initialized' }
-                    );
-                }
-
-                res.json({
-                    projectName,
-                    projectPath,
-                    message: 'TaskMaster initialized successfully',
-                    output: stdout,
-                    timestamp: new Date().toISOString()
-                });
-            } else {
-                console.error('TaskMaster init failed:', stderr);
-                res.status(500).json({
-                    error: 'Failed to initialize TaskMaster',
-                    message: stderr || stdout,
-                    code
-                });
-            }
-        });
-
-        // Send 'yes' responses to automated prompts
-        initProcess.stdin.write('yes\n');
-        initProcess.stdin.end();
 
     } catch (error) {
         console.error('TaskMaster init error:', error);
@@ -1080,73 +1678,42 @@ router.post('/add-task/:projectName', async (req, res) => {
             });
         }
 
-        // Build the task-master add-task command
-        const args = ['task-master-ai', 'add-task'];
-        
-        if (prompt) {
-            args.push('--prompt', prompt);
-            args.push('--research'); // Use research for AI-generated tasks
-        } else {
-            args.push('--prompt', `Create a task titled "${title}" with description: ${description}`);
+        const paths = await ensurePipelineInitialized(projectPath);
+        const { tasks, currentTag } = await readTasksFile(paths.tasksFile);
+        const taskId = generateTaskId(tasks);
+        const now = new Date().toISOString();
+
+        const dependencyList = Array.isArray(dependencies)
+            ? dependencies
+            : typeof dependencies === 'string' && dependencies.trim().length > 0
+                ? dependencies.split(',').map((item) => item.trim()).filter(Boolean)
+                : [];
+
+        const newTask = normalizeTask({
+            id: taskId,
+            title: title || splitPromptToTitle(prompt),
+            description: description || (prompt ? String(prompt).trim() : ''),
+            priority,
+            status: 'pending',
+            dependencies: dependencyList,
+            createdAt: now,
+            updatedAt: now,
+        });
+
+        const nextTasks = [...tasks, newTask];
+        await writeTasksFile(paths.tasksFile, nextTasks, currentTag);
+
+        if (req.app.locals.wss) {
+            broadcastTaskMasterTasksUpdate(req.app.locals.wss, projectName);
         }
-        
-        if (priority) {
-            args.push('--priority', priority);
-        }
-        
-        if (dependencies) {
-            args.push('--dependencies', dependencies);
-        }
 
-        // Run task-master add-task command
-        const addTaskProcess = spawn('npx', args, {
-            cwd: projectPath,
-            stdio: ['pipe', 'pipe', 'pipe']
+        res.json({
+            projectName,
+            projectPath,
+            message: 'Task added successfully',
+            task: newTask,
+            timestamp: now,
         });
-
-        let stdout = '';
-        let stderr = '';
-
-        addTaskProcess.stdout.on('data', (data) => {
-            stdout += data.toString();
-        });
-
-        addTaskProcess.stderr.on('data', (data) => {
-            stderr += data.toString();
-        });
-
-        addTaskProcess.on('close', (code) => {
-            console.log('Add task process completed with code:', code);
-            console.log('Stdout:', stdout);
-            console.log('Stderr:', stderr);
-            
-            if (code === 0) {
-                // Broadcast task update via WebSocket
-                if (req.app.locals.wss) {
-                    broadcastTaskMasterTasksUpdate(
-                        req.app.locals.wss, 
-                        projectName
-                    );
-                }
-
-                res.json({
-                    projectName,
-                    projectPath,
-                    message: 'Task added successfully',
-                    output: stdout,
-                    timestamp: new Date().toISOString()
-                });
-            } else {
-                console.error('Add task failed:', stderr);
-                res.status(500).json({
-                    error: 'Failed to add task',
-                    message: stderr || stdout,
-                    code
-                });
-            }
-        });
-
-        addTaskProcess.stdin.end();
 
     } catch (error) {
         console.error('Add task error:', error);
@@ -1164,7 +1731,7 @@ router.post('/add-task/:projectName', async (req, res) => {
 router.put('/update-task/:projectName/:taskId', async (req, res) => {
     try {
         const { projectName, taskId } = req.params;
-        const { title, description, status, priority, details } = req.body;
+        const { title, description, status, priority, details, testStrategy, dependencies } = req.body;
         
         // Get project path
         let projectPath;
@@ -1177,103 +1744,48 @@ router.put('/update-task/:projectName/:taskId', async (req, res) => {
             });
         }
 
-        // If only updating status, use set-status command
-        if (status && Object.keys(req.body).length === 1) {
-            const setStatusProcess = spawn('npx', ['task-master-ai', 'set-status', `--id=${taskId}`, `--status=${status}`], {
-                cwd: projectPath,
-                stdio: ['pipe', 'pipe', 'pipe']
+        const paths = await ensurePipelineInitialized(projectPath);
+        const { tasks, currentTag } = await readTasksFile(paths.tasksFile);
+        const now = new Date().toISOString();
+        const targetId = String(taskId);
+        const taskIndex = tasks.findIndex((task) => String(task.id) === targetId);
+
+        if (taskIndex === -1) {
+            return res.status(404).json({
+                error: 'Task not found',
+                message: `Task "${taskId}" does not exist`,
             });
-
-            let stdout = '';
-            let stderr = '';
-
-            setStatusProcess.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
-
-            setStatusProcess.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
-
-            setStatusProcess.on('close', (code) => {
-                if (code === 0) {
-                    // Broadcast task update via WebSocket
-                    if (req.app.locals.wss) {
-                        broadcastTaskMasterTasksUpdate(req.app.locals.wss, projectName);
-                    }
-
-                    res.json({
-                        projectName,
-                        projectPath,
-                        taskId,
-                        message: 'Task status updated successfully',
-                        output: stdout,
-                        timestamp: new Date().toISOString()
-                    });
-                } else {
-                    console.error('Set task status failed:', stderr);
-                    res.status(500).json({
-                        error: 'Failed to update task status',
-                        message: stderr || stdout,
-                        code
-                    });
-                }
-            });
-
-            setStatusProcess.stdin.end();
-        } else {
-            // For other updates, use update-task command with a prompt describing the changes
-            const updates = [];
-            if (title) updates.push(`title: "${title}"`);
-            if (description) updates.push(`description: "${description}"`);
-            if (priority) updates.push(`priority: "${priority}"`);
-            if (details) updates.push(`details: "${details}"`);
-            
-            const prompt = `Update task with the following changes: ${updates.join(', ')}`;
-
-            const updateProcess = spawn('npx', ['task-master-ai', 'update-task', `--id=${taskId}`, `--prompt=${prompt}`], {
-                cwd: projectPath,
-                stdio: ['pipe', 'pipe', 'pipe']
-            });
-
-            let stdout = '';
-            let stderr = '';
-
-            updateProcess.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
-
-            updateProcess.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
-
-            updateProcess.on('close', (code) => {
-                if (code === 0) {
-                    // Broadcast task update via WebSocket
-                    if (req.app.locals.wss) {
-                        broadcastTaskMasterTasksUpdate(req.app.locals.wss, projectName);
-                    }
-
-                    res.json({
-                        projectName,
-                        projectPath,
-                        taskId,
-                        message: 'Task updated successfully',
-                        output: stdout,
-                        timestamp: new Date().toISOString()
-                    });
-                } else {
-                    console.error('Update task failed:', stderr);
-                    res.status(500).json({
-                        error: 'Failed to update task',
-                        message: stderr || stdout,
-                        code
-                    });
-                }
-            });
-
-            updateProcess.stdin.end();
         }
+
+        const existingTask = tasks[taskIndex];
+        const updatedTask = {
+            ...existingTask,
+            ...(title !== undefined ? { title } : {}),
+            ...(description !== undefined ? { description } : {}),
+            ...(status !== undefined ? { status } : {}),
+            ...(priority !== undefined ? { priority } : {}),
+            ...(details !== undefined ? { details } : {}),
+            ...(testStrategy !== undefined ? { testStrategy } : {}),
+            ...(dependencies !== undefined ? { dependencies: Array.isArray(dependencies) ? dependencies : [] } : {}),
+            updatedAt: now,
+        };
+
+        const nextTasks = [...tasks];
+        nextTasks[taskIndex] = normalizeTask(updatedTask);
+        await writeTasksFile(paths.tasksFile, nextTasks, currentTag);
+
+        if (req.app.locals.wss) {
+            broadcastTaskMasterTasksUpdate(req.app.locals.wss, projectName);
+        }
+
+        res.json({
+            projectName,
+            projectPath,
+            taskId,
+            message: 'Task updated successfully',
+            task: nextTasks[taskIndex],
+            timestamp: now,
+        });
 
     } catch (error) {
         console.error('Update task error:', error);
@@ -1286,12 +1798,12 @@ router.put('/update-task/:projectName/:taskId', async (req, res) => {
 
 /**
  * POST /api/taskmaster/parse-prd/:projectName
- * Parse a PRD file to generate tasks
+ * Parse a Research Brief JSON file to generate tasks
  */
 router.post('/parse-prd/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
-        const { fileName = 'prd.txt', numTasks, append = false } = req.body;
+        const { fileName = DEFAULT_RESEARCH_BRIEF_FILENAME, numTasks, append = false } = req.body;
         
         // Get project path
         let projectPath;
@@ -1304,82 +1816,103 @@ router.post('/parse-prd/:projectName', async (req, res) => {
             });
         }
 
-        const prdPath = path.join(projectPath, '.taskmaster', 'docs', fileName);
+        const paths = await ensurePipelineInitialized(projectPath);
+        const briefPath = path.join(paths.docsDir, fileName);
         
-        // Check if PRD file exists
+        // Check if brief JSON file exists
         try {
-            await fsPromises.access(prdPath, fs.constants.F_OK);
+            await fsPromises.access(briefPath, fs.constants.F_OK);
         } catch (error) {
             return res.status(404).json({
-                error: 'PRD file not found',
-                message: `File "${fileName}" does not exist in .taskmaster/docs/`
+                error: 'Research Brief file not found',
+                message: `File "${fileName}" does not exist in ${PIPELINE_DIR}/docs/`
             });
         }
 
-        // Build the command args
-        const args = ['task-master-ai', 'parse-prd', prdPath];
-        
-        if (numTasks) {
-            args.push('--num-tasks', numTasks.toString());
+        if (!fileName.endsWith('.json')) {
+            return res.status(400).json({
+                error: 'Invalid brief format',
+                message: 'Research Brief must be a .json file',
+            });
         }
-        
-        if (append) {
-            args.push('--append');
+
+        let briefData;
+        try {
+            const briefContent = await fsPromises.readFile(briefPath, 'utf8');
+            briefData = JSON.parse(briefContent);
+        } catch (parseError) {
+            return res.status(400).json({
+                error: 'Invalid Research Brief JSON',
+                message: parseError.message,
+            });
         }
-        
-        args.push('--research'); // Use research for better PRD parsing
 
-        // Run task-master parse-prd command
-        const parsePRDProcess = spawn('npx', args, {
-            cwd: projectPath,
-            stdio: ['pipe', 'pipe', 'pipe']
+        const maxTasks = Number.isFinite(Number(numTasks)) && Number(numTasks) > 0 ? Number(numTasks) : DEFAULT_MAX_TASKS;
+
+        const { tasks: existingTasks, currentTag } = await readTasksFile(paths.tasksFile);
+        const now = new Date().toISOString();
+
+        const pipelineGenerated = instantiatePipelineTasksFromBrief(briefData, maxTasks);
+        let generatedTasks = [];
+
+        if (pipelineGenerated && pipelineGenerated.length > 0) {
+            let nextId = generateTaskId(existingTasks);
+            generatedTasks = pipelineGenerated.map((task) => normalizeTask({
+                ...task,
+                id: nextId++,
+                createdAt: task.createdAt || now,
+                updatedAt: now,
+            }));
+        } else {
+            const candidates = parseBriefJsonToTaskCandidates(briefData);
+            let nextId = generateTaskId(existingTasks);
+            generatedTasks = candidates.slice(0, maxTasks).map((candidate) => normalizeTask({
+                id: nextId++,
+                title: splitPromptToTitle(candidate),
+                description: candidate,
+                status: 'pending',
+                priority: 'medium',
+                dependencies: [],
+                createdAt: now,
+                updatedAt: now,
+                stage: inferStageFromCandidate(candidate),
+                taskType: 'exploration',
+                suggestedSkills: ensureArray(getStageSkillMap()[inferStageFromCandidate(candidate)]?.base),
+                sourceBlueprintId: `legacy.candidate.${nextId - 1}`,
+                nextActionPrompt: [
+                    `Task: ${splitPromptToTitle(candidate)}`,
+                    `Description: ${candidate}`,
+                    'Please turn this into a concrete actionable plan and provide first-step outputs.',
+                ].join('\n'),
+            }));
+        }
+
+        const nextTasks = append
+            ? [...existingTasks, ...dedupeGeneratedTasks(existingTasks, generatedTasks)]
+            : generatedTasks;
+        await writeTasksFile(paths.tasksFile, nextTasks, currentTag);
+
+        if (req.app.locals.wss) {
+            broadcastTaskMasterTasksUpdate(req.app.locals.wss, projectName);
+        }
+
+        res.json({
+            projectName,
+            projectPath,
+            briefFile: fileName,
+            generationMode: pipelineGenerated ? 'pipeline-blueprint' : 'legacy-fallback',
+            message: pipelineGenerated
+                ? 'Research Brief pipeline instantiated successfully'
+                : 'Research Brief parsed and tasks generated successfully',
+            generatedCount: generatedTasks.length,
+            totalTasks: nextTasks.length,
+            timestamp: now,
         });
-
-        let stdout = '';
-        let stderr = '';
-
-        parsePRDProcess.stdout.on('data', (data) => {
-            stdout += data.toString();
-        });
-
-        parsePRDProcess.stderr.on('data', (data) => {
-            stderr += data.toString();
-        });
-
-        parsePRDProcess.on('close', (code) => {
-            if (code === 0) {
-                // Broadcast task update via WebSocket
-                if (req.app.locals.wss) {
-                    broadcastTaskMasterTasksUpdate(
-                        req.app.locals.wss, 
-                        projectName
-                    );
-                }
-
-                res.json({
-                    projectName,
-                    projectPath,
-                    prdFile: fileName,
-                    message: 'PRD parsed and tasks generated successfully',
-                    output: stdout,
-                    timestamp: new Date().toISOString()
-                });
-            } else {
-                console.error('Parse PRD failed:', stderr);
-                res.status(500).json({
-                    error: 'Failed to parse PRD',
-                    message: stderr || stdout,
-                    code
-                });
-            }
-        });
-
-        parsePRDProcess.stdin.end();
 
     } catch (error) {
         console.error('Parse PRD error:', error);
         res.status(500).json({
-            error: 'Failed to parse PRD',
+            error: 'Failed to parse Research Brief',
             message: error.message
         });
     }
@@ -1391,432 +1924,7 @@ router.post('/parse-prd/:projectName', async (req, res) => {
  */
 router.get('/prd-templates', async (req, res) => {
     try {
-        // Return built-in templates
-        const templates = [
-            {
-                id: 'web-app',
-                name: 'Web Application',
-                description: 'Template for web application projects with frontend and backend components',
-                category: 'web',
-                content: `# Product Requirements Document - Web Application
-
-## Overview
-**Product Name:** [Your App Name]
-**Version:** 1.0
-**Date:** ${new Date().toISOString().split('T')[0]}
-**Author:** [Your Name]
-
-## Executive Summary
-Brief description of what this web application will do and why it's needed.
-
-## Product Goals
-- Goal 1: [Specific measurable goal]
-- Goal 2: [Specific measurable goal]
-- Goal 3: [Specific measurable goal]
-
-## User Stories
-### Core Features
-1. **User Registration & Authentication**
-   - As a user, I want to create an account so I can access personalized features
-   - As a user, I want to log in securely so my data is protected
-   - As a user, I want to reset my password if I forget it
-
-2. **Main Application Features**
-   - As a user, I want to [core feature 1] so I can [benefit]
-   - As a user, I want to [core feature 2] so I can [benefit]
-   - As a user, I want to [core feature 3] so I can [benefit]
-
-3. **User Interface**
-   - As a user, I want a responsive design so I can use the app on any device
-   - As a user, I want intuitive navigation so I can easily find features
-
-## Technical Requirements
-### Frontend
-- Framework: React/Vue/Angular or vanilla JavaScript
-- Styling: CSS framework (Tailwind, Bootstrap, etc.)
-- State Management: Redux/Vuex/Context API
-- Build Tools: Webpack/Vite
-- Testing: Jest/Vitest for unit tests
-
-### Backend
-- Runtime: Node.js/Python/Java
-- Database: PostgreSQL/MySQL/MongoDB
-- API: RESTful API or GraphQL
-- Authentication: JWT tokens
-- Testing: Integration and unit tests
-
-### Infrastructure
-- Hosting: Cloud provider (AWS, Azure, GCP)
-- CI/CD: GitHub Actions/GitLab CI
-- Monitoring: Application monitoring tools
-- Security: HTTPS, input validation, rate limiting
-
-## Success Metrics
-- User engagement metrics
-- Performance benchmarks (load time < 2s)
-- Error rates < 1%
-- User satisfaction scores
-
-## Timeline
-- Phase 1: Core functionality (4-6 weeks)
-- Phase 2: Advanced features (2-4 weeks)  
-- Phase 3: Polish and launch (2 weeks)
-
-## Constraints & Assumptions
-- Budget constraints
-- Technical limitations
-- Team size and expertise
-- Timeline constraints`
-            },
-            {
-                id: 'api',
-                name: 'REST API',
-                description: 'Template for REST API development projects',
-                category: 'backend',
-                content: `# Product Requirements Document - REST API
-
-## Overview
-**API Name:** [Your API Name]
-**Version:** v1.0
-**Date:** ${new Date().toISOString().split('T')[0]}
-**Author:** [Your Name]
-
-## Executive Summary
-Description of the API's purpose, target users, and primary use cases.
-
-## API Goals
-- Goal 1: Provide secure data access
-- Goal 2: Ensure scalable architecture
-- Goal 3: Maintain high availability (99.9% uptime)
-
-## Functional Requirements
-### Core Endpoints
-1. **Authentication Endpoints**
-   - POST /api/auth/login - User authentication
-   - POST /api/auth/logout - User logout
-   - POST /api/auth/refresh - Token refresh
-   - POST /api/auth/register - User registration
-
-2. **Data Management Endpoints**
-   - GET /api/resources - List resources with pagination
-   - GET /api/resources/{id} - Get specific resource
-   - POST /api/resources - Create new resource
-   - PUT /api/resources/{id} - Update existing resource
-   - DELETE /api/resources/{id} - Delete resource
-
-3. **Administrative Endpoints**
-   - GET /api/admin/users - Manage users (admin only)
-   - GET /api/admin/analytics - System analytics
-   - POST /api/admin/backup - Trigger system backup
-
-## Technical Requirements
-### API Design
-- RESTful architecture following OpenAPI 3.0 specification
-- JSON request/response format
-- Consistent error response format
-- API versioning strategy
-
-### Authentication & Security
-- JWT token-based authentication
-- Role-based access control (RBAC)
-- Rate limiting (100 requests/minute per user)
-- Input validation and sanitization
-- HTTPS enforcement
-
-### Database
-- Database type: [PostgreSQL/MongoDB/MySQL]
-- Connection pooling
-- Database migrations
-- Backup and recovery procedures
-
-### Performance Requirements
-- Response time: < 200ms for 95% of requests
-- Throughput: 1000+ requests/second
-- Concurrent users: 10,000+
-- Database query optimization
-
-### Documentation
-- Auto-generated API documentation (Swagger/OpenAPI)
-- Code examples for common use cases
-- SDK development for major languages
-- Postman collection for testing
-
-## Error Handling
-- Standardized error codes and messages
-- Proper HTTP status codes
-- Detailed error logging
-- Graceful degradation strategies
-
-## Testing Strategy
-- Unit tests (80%+ coverage)
-- Integration tests for all endpoints
-- Load testing and performance testing
-- Security testing (OWASP compliance)
-
-## Monitoring & Logging
-- Application performance monitoring
-- Error tracking and alerting
-- Access logs and audit trails
-- Health check endpoints
-
-## Deployment
-- Containerized deployment (Docker)
-- CI/CD pipeline setup
-- Environment management (dev, staging, prod)
-- Blue-green deployment strategy
-
-## Success Metrics
-- API uptime > 99.9%
-- Average response time < 200ms
-- Zero critical security vulnerabilities
-- Developer adoption metrics`
-            },
-            {
-                id: 'mobile-app',
-                name: 'Mobile Application',
-                description: 'Template for mobile app development projects (iOS/Android)',
-                category: 'mobile',
-                content: `# Product Requirements Document - Mobile Application
-
-## Overview
-**App Name:** [Your App Name]
-**Platform:** iOS / Android / Cross-platform
-**Version:** 1.0
-**Date:** ${new Date().toISOString().split('T')[0]}
-**Author:** [Your Name]
-
-## Executive Summary
-Brief description of the mobile app's purpose, target audience, and key value proposition.
-
-## Product Goals
-- Goal 1: [Specific user engagement goal]
-- Goal 2: [Specific functionality goal]
-- Goal 3: [Specific performance goal]
-
-## User Stories
-### Core Features
-1. **Onboarding & Authentication**
-   - As a new user, I want a simple onboarding process
-   - As a user, I want to sign up with email or social media
-   - As a user, I want biometric authentication for security
-
-2. **Main App Features**
-   - As a user, I want [core feature 1] accessible from home screen
-   - As a user, I want [core feature 2] to work offline
-   - As a user, I want to sync data across devices
-
-3. **User Experience**
-   - As a user, I want intuitive navigation patterns
-   - As a user, I want fast loading times
-   - As a user, I want accessibility features
-
-## Technical Requirements
-### Mobile Development
-- **Cross-platform:** React Native / Flutter / Xamarin
-- **Native:** Swift (iOS) / Kotlin (Android)
-- **State Management:** Redux / MobX / Provider
-- **Navigation:** React Navigation / Flutter Navigation
-
-### Backend Integration
-- REST API or GraphQL integration
-- Real-time features (WebSockets/Push notifications)
-- Offline data synchronization
-- Background processing
-
-### Device Features
-- Camera and photo library access
-- GPS location services
-- Push notifications
-- Biometric authentication
-- Device storage
-
-### Performance Requirements
-- App launch time < 3 seconds
-- Screen transition animations < 300ms
-- Memory usage optimization
-- Battery usage optimization
-
-## Platform-Specific Considerations
-### iOS Requirements
-- iOS 13.0+ minimum version
-- App Store guidelines compliance
-- iOS design guidelines (Human Interface Guidelines)
-- TestFlight beta testing
-
-### Android Requirements
-- Android 8.0+ (API level 26) minimum
-- Google Play Store guidelines
-- Material Design guidelines
-- Google Play Console testing
-
-## User Interface Design
-- Responsive design for different screen sizes
-- Dark mode support
-- Accessibility compliance (WCAG 2.1)
-- Consistent design system
-
-## Security & Privacy
-- Secure data storage (Keychain/Keystore)
-- API communication encryption
-- Privacy policy compliance (GDPR/CCPA)
-- App security best practices
-
-## Testing Strategy
-- Unit testing (80%+ coverage)
-- UI/E2E testing (Detox/Appium)
-- Device testing on multiple screen sizes
-- Performance testing
-- Security testing
-
-## App Store Deployment
-- App store optimization (ASO)
-- App icons and screenshots
-- Store listing content
-- Release management strategy
-
-## Analytics & Monitoring
-- User analytics (Firebase/Analytics)
-- Crash reporting (Crashlytics/Sentry)
-- Performance monitoring
-- User feedback collection
-
-## Success Metrics
-- App store ratings > 4.0
-- User retention rates
-- Daily/Monthly active users
-- App performance metrics
-- Conversion rates`
-            },
-            {
-                id: 'data-analysis',
-                name: 'Data Analysis Project',
-                description: 'Template for data analysis and visualization projects',
-                category: 'data',
-                content: `# Product Requirements Document - Data Analysis Project
-
-## Overview
-**Project Name:** [Your Analysis Project]
-**Analysis Type:** [Descriptive/Predictive/Prescriptive]
-**Date:** ${new Date().toISOString().split('T')[0]}
-**Author:** [Your Name]
-
-## Executive Summary
-Description of the business problem, data sources, and expected insights.
-
-## Project Goals
-- Goal 1: [Specific business question to answer]
-- Goal 2: [Specific prediction to make]
-- Goal 3: [Specific recommendation to provide]
-
-## Business Requirements
-### Key Questions
-1. What patterns exist in the current data?
-2. What factors influence [target variable]?
-3. What predictions can be made for [future outcome]?
-4. What recommendations can improve [business metric]?
-
-### Success Criteria
-- Actionable insights for stakeholders
-- Statistical significance in findings
-- Reproducible analysis pipeline
-- Clear visualization and reporting
-
-## Data Requirements
-### Data Sources
-1. **Primary Data**
-   - Source: [Database/API/Files]
-   - Format: [CSV/JSON/SQL]
-   - Size: [Volume estimate]
-   - Update frequency: [Real-time/Daily/Monthly]
-
-2. **External Data**
-   - Third-party APIs
-   - Public datasets
-   - Market research data
-
-### Data Quality Requirements
-- Data completeness (< 5% missing values)
-- Data accuracy validation
-- Data consistency checks
-- Historical data availability
-
-## Technical Requirements
-### Data Pipeline
-- Data extraction and ingestion
-- Data cleaning and preprocessing
-- Data transformation and feature engineering
-- Data validation and quality checks
-
-### Analysis Tools
-- **Programming:** Python/R/SQL
-- **Libraries:** pandas, numpy, scikit-learn, matplotlib
-- **Visualization:** Tableau, PowerBI, or custom dashboards
-- **Version Control:** Git for code and DVC for data
-
-### Computing Resources
-- Local development environment
-- Cloud computing (AWS/GCP/Azure) if needed
-- Database access and permissions
-- Storage requirements
-
-## Analysis Methodology
-### Data Exploration
-1. Descriptive statistics and data profiling
-2. Data visualization and pattern identification
-3. Correlation analysis
-4. Outlier detection and handling
-
-### Statistical Analysis
-1. Hypothesis formulation
-2. Statistical testing
-3. Confidence intervals
-4. Effect size calculations
-
-### Machine Learning (if applicable)
-1. Feature selection and engineering
-2. Model selection and training
-3. Cross-validation and evaluation
-4. Model interpretation and explainability
-
-## Deliverables
-### Reports
-- Executive summary for stakeholders
-- Technical analysis report
-- Data quality report
-- Methodology documentation
-
-### Visualizations
-- Interactive dashboards
-- Static charts and graphs
-- Data story presentations
-- Key findings infographics
-
-### Code & Documentation
-- Reproducible analysis scripts
-- Data pipeline code
-- Documentation and comments
-- Testing and validation code
-
-## Timeline
-- Phase 1: Data collection and exploration (2 weeks)
-- Phase 2: Analysis and modeling (3 weeks)
-- Phase 3: Reporting and visualization (1 week)
-- Phase 4: Stakeholder presentation (1 week)
-
-## Risks & Assumptions
-- Data availability and quality risks
-- Technical complexity assumptions
-- Resource and timeline constraints
-- Stakeholder engagement assumptions
-
-## Success Metrics
-- Stakeholder satisfaction with insights
-- Accuracy of predictions (if applicable)
-- Business impact of recommendations
-- Reproducibility of results`
-            }
-        ];
-
+        const templates = await getAvailableTemplates();
         res.json({
             templates,
             timestamp: new Date().toISOString()
@@ -1831,14 +1939,49 @@ Description of the business problem, data sources, and expected insights.
     }
 });
 
+function normalizeLoadedTemplate(template = {}) {
+    return {
+        ...template,
+        category: template.category || template.domain || 'general',
+        format: template.format || 'research-brief-json',
+        fileName: template.fileName || DEFAULT_RESEARCH_BRIEF_FILENAME,
+        metaFields: Array.isArray(template.metaFields) ? template.metaFields : [],
+        sectionFields: template.sectionFields && typeof template.sectionFields === 'object' ? template.sectionFields : {},
+    };
+}
+
+function cloneJsonCompatible(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function buildBriefFromTemplate(template, nowDate) {
+    const stageSkillMap = getStageSkillMap();
+    return {
+        schemaVersion: '1.1',
+        templateId: template.id,
+        meta: {
+            title: '',
+            lead_author: '',
+            target_venue: '',
+            date: nowDate,
+        },
+        sections: cloneJsonCompatible(DEFAULT_BRIEF_SECTIONS),
+        pipeline: cloneJsonCompatible(
+            template?.pipeline && typeof template.pipeline === 'object'
+                ? template.pipeline
+                : buildDefaultBriefPipeline(stageSkillMap),
+        ),
+    };
+}
+
 /**
  * POST /api/taskmaster/apply-template/:projectName
- * Apply a PRD template to create a new PRD file
+ * Apply a structured template to create/update a Research Brief JSON file
  */
 router.post('/apply-template/:projectName', async (req, res) => {
     try {
         const { projectName } = req.params;
-        const { templateId, fileName = 'prd.txt', customizations = {} } = req.body;
+        const { templateId, fileName = DEFAULT_RESEARCH_BRIEF_FILENAME, customizations = {} } = req.body;
 
         if (!templateId) {
             return res.status(400).json({
@@ -1858,7 +2001,6 @@ router.post('/apply-template/:projectName', async (req, res) => {
             });
         }
 
-        // Get the template content (this would normally fetch from the templates list)
         const templates = await getAvailableTemplates();
         const template = templates.find(t => t.id === templateId);
 
@@ -1869,17 +2011,40 @@ router.post('/apply-template/:projectName', async (req, res) => {
             });
         }
 
-        // Apply customizations to template content
-        let content = template.content;
-        
-        // Replace placeholders with customizations
-        for (const [key, value] of Object.entries(customizations)) {
-            const placeholder = `[${key}]`;
-            content = content.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), 'g'), value);
+        if (!fileName.endsWith('.json')) {
+            return res.status(400).json({
+                error: 'Invalid filename',
+                message: 'Research Brief must be saved as .json',
+            });
         }
 
-        // Ensure .taskmaster/docs directory exists
-        const docsDir = path.join(projectPath, '.taskmaster', 'docs');
+        const now = new Date().toISOString().split('T')[0];
+        const brief = buildBriefFromTemplate(template, now);
+
+        const allFields = [
+            ...(Array.isArray(template.metaFields) ? template.metaFields : []),
+            ...Object.values(template.sectionFields || {}).flat(),
+        ];
+
+        allFields.forEach((field) => {
+            const submitted = customizations?.[field.path];
+            if (submitted === undefined || submitted === null) return;
+            const rawValue = typeof submitted === 'string' ? submitted.trim() : submitted;
+            if (rawValue === '') return;
+
+            if (field.type === 'array') {
+                const values = Array.isArray(rawValue)
+                    ? rawValue.map((item) => String(item).trim()).filter(Boolean)
+                    : String(rawValue).split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+                assignPath(brief, field.path, values);
+                return;
+            }
+
+            assignPath(brief, field.path, String(rawValue));
+        });
+
+        const paths = await ensurePipelineInitialized(projectPath);
+        const docsDir = paths.docsDir;
         try {
             await fsPromises.mkdir(docsDir, { recursive: true });
         } catch (error) {
@@ -1890,7 +2055,7 @@ router.post('/apply-template/:projectName', async (req, res) => {
 
         // Write the template content to the file
         try {
-            await fsPromises.writeFile(filePath, content, 'utf8');
+            await fsPromises.writeFile(filePath, `${JSON.stringify(brief, null, 2)}\n`, 'utf8');
 
             res.json({
                 projectName,
@@ -1898,15 +2063,15 @@ router.post('/apply-template/:projectName', async (req, res) => {
                 templateId,
                 templateName: template.name,
                 fileName,
-                filePath: filePath,
-                message: 'PRD template applied successfully',
+                filePath: path.relative(projectPath, filePath),
+                message: 'Research Brief template applied successfully',
                 timestamp: new Date().toISOString()
             });
 
         } catch (writeError) {
             console.error('Failed to write PRD template:', writeError);
             return res.status(500).json({
-                error: 'Failed to write PRD template',
+                error: 'Failed to write Research Brief',
                 message: writeError.message
             });
         }
@@ -1914,7 +2079,7 @@ router.post('/apply-template/:projectName', async (req, res) => {
     } catch (error) {
         console.error('Apply template error:', error);
         res.status(500).json({
-            error: 'Failed to apply PRD template',
+            error: 'Failed to apply Research Brief template',
             message: error.message
         });
     }
@@ -1922,42 +2087,35 @@ router.post('/apply-template/:projectName', async (req, res) => {
 
 // Helper function to get available templates
 async function getAvailableTemplates() {
-    // This could be extended to read from files or database
-    return [
-        {
-            id: 'web-app',
-            name: 'Web Application',
-            description: 'Template for web application projects',
-            category: 'web',
-            content: `# Product Requirements Document - Web Application
+    if (cachedTemplates) {
+        return cachedTemplates;
+    }
 
-## Overview
-**Product Name:** [Your App Name]
-**Version:** 1.0
-**Date:** ${new Date().toISOString().split('T')[0]}
-**Author:** [Your Name]
+    let files = [];
+    try {
+        files = await fsPromises.readdir(TEMPLATES_DIR);
+    } catch (error) {
+        throw new Error(`Failed to read templates directory: ${error.message}`);
+    }
 
-## Executive Summary
-Brief description of what this web application will do and why it's needed.
+    const jsonFiles = files.filter((name) => name.endsWith('.json'));
+    if (jsonFiles.length === 0) {
+        throw new Error(`No template JSON files found in ${TEMPLATES_DIR}`);
+    }
 
-## User Stories
-1. As a user, I want [feature] so I can [benefit]
-2. As a user, I want [feature] so I can [benefit]
-3. As a user, I want [feature] so I can [benefit]
+    const loaded = [];
+    for (const fileName of jsonFiles) {
+        const filePath = path.join(TEMPLATES_DIR, fileName);
+        const content = await fsPromises.readFile(filePath, 'utf8');
+        const parsed = JSON.parse(content);
+        if (!parsed?.id || !parsed?.name) {
+            throw new Error(`Template "${fileName}" missing required fields: id/name`);
+        }
+        loaded.push(normalizeLoadedTemplate(parsed));
+    }
 
-## Technical Requirements
-- Frontend framework
-- Backend services
-- Database requirements
-- Security considerations
-
-## Success Metrics
-- User engagement metrics
-- Performance benchmarks
-- Business objectives`
-        },
-        // Add other templates here if needed
-    ];
+    cachedTemplates = loaded.sort((a, b) => a.name.localeCompare(b.name));
+    return cachedTemplates;
 }
 
 export default router;

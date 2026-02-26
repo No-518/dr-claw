@@ -106,7 +106,7 @@ temp/
 .cline/
 .windsurf/
 .serena/
-CLAUDE.md
+/CLAUDE.md
 .mcp.json
 
 
@@ -131,3 +131,13 @@ dev-debug.log
 tasks.json
 tasks/
 *.tar.gz
+
+# Security scan reports
+gitleaks-report*.json
+
+
+# local
+backup/
+
+# Pipeline runtime (local state)
+.pipeline/

@@ -95,13 +95,23 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
   return (
     <div
       ref={messageRef}
-      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} ${message.type === 'user' ? 'flex justify-end px-3 sm:px-0' : 'px-3 sm:px-0'}`}
+      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} flex flex-col w-full max-w-2xl mx-auto px-4 sm:px-6`}
     >
       {message.type === 'user' ? (
-        /* User message bubble on the right */
-        <div className="flex items-end space-x-0 sm:space-x-3 w-full sm:w-auto sm:max-w-[85%] md:max-w-md lg:max-w-lg xl:max-w-xl">
-          <div className="bg-blue-600 text-white rounded-2xl rounded-br-md px-3 sm:px-4 py-2 shadow-sm flex-1 sm:flex-initial">
-            <div className="text-sm whitespace-pre-wrap break-words">
+        /* User message bubble */
+        <div className="flex flex-col items-end w-full mb-4">
+          <div className="flex items-center space-x-2 mb-1.5">
+            {!isGrouped && (
+              <>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('messageTypes.user', { defaultValue: 'User' })}</span>
+                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-[10px] flex-shrink-0">
+                  U
+                </div>
+              </>
+            )}
+          </div>
+          <div className="bg-blue-600 text-white rounded-2xl rounded-tr-none px-4 py-2.5 shadow-sm max-w-[90%] sm:max-w-[85%]">
+            <div className="text-[15px] whitespace-pre-wrap break-words leading-relaxed">
               {message.content}
             </div>
             {message.images && message.images.length > 0 && (
@@ -117,13 +127,10 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                 ))}
               </div>
             )}
-            <div className="text-xs text-blue-100 mt-1 text-right">
-              {formattedTime}
-            </div>
           </div>
           {!isGrouped && (
-            <div className="hidden sm:flex w-8 h-8 bg-blue-600 rounded-full items-center justify-center text-white text-sm flex-shrink-0">
-              U
+            <div className="text-[10px] text-gray-400 mt-1 mr-1">
+              {formattedTime}
             </div>
           )}
         </div>
@@ -136,30 +143,30 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
           </div>
         </div>
       ) : (
-        /* Claude/Error/Tool messages on the left */
-        <div className="w-full">
+        /* Claude/Error/Tool messages */
+        <div className="flex flex-col w-full mb-6">
           {!isGrouped && (
-            <div className="flex items-center space-x-3 mb-2">
+            <div className="flex items-center space-x-2 mb-2">
               {message.type === 'error' ? (
-                <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
+                <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-white text-[10px] flex-shrink-0">
                   !
                 </div>
               ) : message.type === 'tool' ? (
-                <div className="w-8 h-8 bg-gray-600 dark:bg-gray-700 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
+                <div className="w-6 h-6 bg-gray-600 dark:bg-gray-700 rounded-full flex items-center justify-center text-white text-[10px] flex-shrink-0">
                   🔧
                 </div>
               ) : (
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0 p-1">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
                   <SessionProviderLogo provider={provider} className="w-full h-full" />
                 </div>
               )}
-              <div className="text-sm font-medium text-gray-900 dark:text-white">
+              <div className="text-xs font-semibold text-gray-900 dark:text-white">
                 {message.type === 'error' ? t('messageTypes.error') : message.type === 'tool' ? t('messageTypes.tool') : (provider === 'cursor' ? t('messageTypes.cursor') : provider === 'codex' ? t('messageTypes.codex') : t('messageTypes.claude'))}
               </div>
             </div>
           )}
           
-          <div className="w-full">
+          <div className="w-full pl-0">
 
             {message.isToolUse ? (
               <>
@@ -184,6 +191,8 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                     autoExpandTools={autoExpandTools}
                     showRawParameters={showRawParameters}
                     rawToolInput={typeof message.toolInput === 'string' ? message.toolInput : undefined}
+                    isSubagentContainer={message.isSubagentContainer}
+                    subagentState={message.subagentState}
                   />
                 )}
                 
@@ -376,7 +385,7 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                 </details>
               </div>
             ) : (
-              <div className="text-sm text-gray-700 dark:text-gray-300">
+              <div className="text-[15px] text-gray-700 dark:text-gray-300">
                 {/* Thinking accordion for reasoning */}
                 {showThinking && message.reasoning && (
                   <details className="mb-3">
@@ -426,11 +435,11 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
 
                   // Normal rendering for non-JSON content
                   return message.type === 'assistant' ? (
-                    <Markdown className="prose prose-sm max-w-none dark:prose-invert prose-gray">
+                    <Markdown className="prose prose-md max-w-none dark:prose-invert prose-gray text-[15.5px] leading-relaxed">
                       {content}
                     </Markdown>
                   ) : (
-                    <div className="whitespace-pre-wrap">
+                    <div className="whitespace-pre-wrap text-[15.5px] leading-relaxed">
                       {content}
                     </div>
                   );
@@ -439,7 +448,7 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
             )}
             
             {!isGrouped && (
-              <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+              <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-2">
                 {formattedTime}
               </div>
             )}

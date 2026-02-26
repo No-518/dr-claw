@@ -8,8 +8,13 @@ const workspaceRoot = fileURLToPath(new URL('.', import.meta.url))
 export default defineConfig(({ command, mode }) => {
   // Load env file based on `mode` in the current working directory.
   const env = loadEnv(mode, process.cwd(), '')
-  
-  
+
+  const host = env.HOST || '0.0.0.0'
+  // When binding to all interfaces (0.0.0.0), proxy should connect to localhost.
+  // Otherwise, proxy to the specific host the backend is bound to.
+  const proxyHost = host === '0.0.0.0' ? 'localhost' : host
+  const port = env.PORT || 3001
+
   return {
     plugins: [react()],
     resolve: {
@@ -34,11 +39,12 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     server: {
+      host,
       port: parseInt(env.VITE_PORT) || 5173,
       proxy: {
-        '/api': `http://localhost:${env.PORT || 3001}`,
+        '/api': `http://${proxyHost}:${port}`,
         '/latexlab-api': {
-          target: `http://localhost:${env.PORT || 3001}`,
+          target: `http://${proxyHost}:${port}`,
           changeOrigin: true,
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq) => {
@@ -47,11 +53,11 @@ export default defineConfig(({ command, mode }) => {
           },
         },
         '/ws': {
-          target: `ws://localhost:${env.PORT || 3001}`,
+          target: `ws://${proxyHost}:${port}`,
           ws: true
         },
         '/shell': {
-          target: `ws://localhost:${env.PORT || 3001}`,
+          target: `ws://${proxyHost}:${port}`,
           ws: true
         }
       }

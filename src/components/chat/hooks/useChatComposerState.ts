@@ -11,6 +11,7 @@ import type {
 } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { authenticatedFetch } from '../../../utils/api';
+import { isTelemetryEnabled } from '../../../utils/telemetry';
 
 import { thinkingModes } from '../constants/thinkingModes';
 
@@ -271,13 +272,14 @@ export function useChatComposerState({
   }, [setChatMessages]);
 
   const executeCommand = useCallback(
-    async (command: SlashCommand) => {
+    async (command: SlashCommand, rawInput?: string) => {
       if (!command || !selectedProject) {
         return;
       }
 
       try {
-        const commandMatch = input.match(new RegExp(`${escapeRegExp(command.name)}\\s*(.*)`));
+        const effectiveInput = rawInput ?? input;
+        const commandMatch = effectiveInput.match(new RegExp(`${escapeRegExp(command.name)}\\s*(.*)`));
         const args =
           commandMatch && commandMatch[1] ? commandMatch[1].trim().split(/\s+/) : [];
 
@@ -351,6 +353,7 @@ export function useChatComposerState({
   );
 
   const {
+    slashCommands,
     slashCommandsCount,
     filteredCommands,
     frequentCommands,
@@ -473,6 +476,28 @@ export function useChatComposerState({
         return;
       }
 
+      const trimmedInput = currentInput.trim();
+      if (trimmedInput.startsWith('/')) {
+        const firstSpace = trimmedInput.indexOf(' ');
+        const commandName = firstSpace > 0 ? trimmedInput.slice(0, firstSpace) : trimmedInput;
+        const matchedCommand = slashCommands.find((command: SlashCommand) => command.name === commandName);
+
+        if (matchedCommand) {
+          await executeCommand(matchedCommand, trimmedInput);
+          setInput('');
+          inputValueRef.current = '';
+          setAttachedImages([]);
+          setUploadingImages(new Map());
+          setImageErrors(new Map());
+          resetCommandMenuState();
+          setIsTextareaExpanded(false);
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+          }
+          return;
+        }
+      }
+
       let messageContent = currentInput;
       const selectedThinkingMode = thinkingModes.find((mode: { id: string; prefix?: string }) => mode.id === thinkingMode);
       if (selectedThinkingMode && selectedThinkingMode.prefix) {
@@ -571,6 +596,7 @@ export function useChatComposerState({
 
       const toolsSettings = getToolsSettings();
       const resolvedProjectPath = selectedProject.fullPath || selectedProject.path || '';
+      const telemetryEnabled = isTelemetryEnabled();
 
       if (provider === 'cursor') {
         sendMessage({
@@ -585,6 +611,7 @@ export function useChatComposerState({
             model: cursorModel,
             skipPermissions: toolsSettings?.skipPermissions || false,
             toolsSettings,
+            telemetryEnabled,
           },
         });
       } else if (provider === 'codex') {
@@ -599,6 +626,7 @@ export function useChatComposerState({
             resume: Boolean(effectiveSessionId),
             model: codexModel,
             permissionMode: permissionMode === 'plan' ? 'default' : permissionMode,
+            telemetryEnabled,
           },
         });
       } else {
@@ -614,6 +642,7 @@ export function useChatComposerState({
             permissionMode,
             model: claudeModel,
             images: uploadedImages,
+            telemetryEnabled,
           },
         });
       }
@@ -639,6 +668,7 @@ export function useChatComposerState({
       codexModel,
       currentSessionId,
       cursorModel,
+      executeCommand,
       isLoading,
       onSessionActive,
       pendingViewSessionRef,
@@ -654,6 +684,7 @@ export function useChatComposerState({
       setClaudeStatus,
       setIsLoading,
       setIsUserScrolledUp,
+      slashCommands,
       thinkingMode,
     ],
   );
@@ -903,8 +934,11 @@ export function useChatComposerState({
     [sendMessage, setClaudeStatus, setPendingPermissionRequests],
   );
 
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
   const handleInputFocusChange = useCallback(
     (focused: boolean) => {
+      setIsInputFocused(focused);
       onInputFocusChange?.(focused);
     },
     [onInputFocusChange],
@@ -953,5 +987,6 @@ export function useChatComposerState({
     handlePermissionDecision,
     handleGrantToolPermission,
     handleInputFocusChange,
+    isInputFocused,
   };
 }

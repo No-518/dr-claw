@@ -5,17 +5,16 @@ import FileTree from '../../FileTree';
 import StandaloneShell from '../../StandaloneShell';
 import GitPanel from '../../GitPanel';
 import ResearchLab from '../../ResearchLab';
+import SkillsDashboard from '../../SkillsDashboard';
 import ErrorBoundary from '../../ErrorBoundary';
 
 import MainContentHeader from './subcomponents/MainContentHeader';
 import MainContentStateView from './subcomponents/MainContentStateView';
 import EditorSidebar from './subcomponents/EditorSidebar';
-import TaskMasterPanel from './subcomponents/TaskMasterPanel';
 import LatexLoadingFallback from './subcomponents/LatexLoadingFallback';
 import type { MainContentProps } from '../types/types';
 
 import { useTaskMaster } from '../../../contexts/TaskMasterContext';
-import { useTasksSettings } from '../../../contexts/TasksSettingsContext';
 import { useUiPreferences } from '../../../hooks/useUiPreferences';
 import { useEditorSidebar } from '../hooks/useEditorSidebar';
 import type { Project } from '../../../types/app';
@@ -27,12 +26,6 @@ const LazyLatexEditingPanel = lazy(() => import('./subcomponents/LatexEditingPan
 type TaskMasterContextValue = {
   currentProject?: Project | null;
   setCurrentProject?: ((project: Project) => void) | null;
-};
-
-type TasksSettingsContextValue = {
-  tasksEnabled: boolean;
-  isTaskMasterInstalled: boolean | null;
-  isTaskMasterReady: boolean | null;
 };
 
 function MainContent({
@@ -62,9 +55,7 @@ function MainContent({
   const [preferredLatexFilePath, setPreferredLatexFilePath] = useState('');
 
   const { currentProject, setCurrentProject } = useTaskMaster() as TaskMasterContextValue;
-  const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings() as TasksSettingsContextValue;
-
-  const shouldShowTasksTab = Boolean(tasksEnabled && isTaskMasterInstalled);
+  const shouldShowTasksTab = false;
 
   const {
     editingFile,
@@ -87,10 +78,10 @@ function MainContent({
   }, [selectedProject, currentProject, setCurrentProject]);
 
   useEffect(() => {
-    if (!shouldShowTasksTab && activeTab === 'tasks') {
-      setActiveTab('chat');
+    if (activeTab === 'tasks') {
+      setActiveTab('researchlab');
     }
-  }, [shouldShowTasksTab, activeTab, setActiveTab]);
+  }, [activeTab, setActiveTab]);
 
   useEffect(() => {
     if (activeTab !== 'latex') {
@@ -153,7 +144,7 @@ function MainContent({
                 autoScrollToBottom={autoScrollToBottom}
                 sendByCtrlEnter={sendByCtrlEnter}
                 externalMessageUpdate={externalMessageUpdate}
-                onShowAllTasks={tasksEnabled ? () => setActiveTab('tasks') : null}
+                onShowAllTasks={() => setActiveTab('researchlab')}
               />
             </ErrorBoundary>
           </div>
@@ -171,7 +162,7 @@ function MainContent({
 
           {activeTab === 'shell' && (
             <div className="h-full w-full overflow-hidden">
-              <AnyStandaloneShell project={selectedProject} session={selectedSession} showHeader={false} />
+              <AnyStandaloneShell project={selectedProject} session={selectedSession} isPlainShell={true} showHeader={false} />
             </div>
           )}
 
@@ -183,7 +174,16 @@ function MainContent({
 
           {activeTab === 'researchlab' && (
             <div className="h-full overflow-hidden">
-              <ResearchLab selectedProject={selectedProject} />
+              <ResearchLab
+                selectedProject={selectedProject}
+                onNavigateToChat={() => setActiveTab('chat')}
+              />
+            </div>
+          )}
+
+          {activeTab === 'skills' && (
+            <div className="h-full overflow-hidden">
+              <SkillsDashboard />
             </div>
           )}
 
@@ -200,13 +200,11 @@ function MainContent({
             </div>
           )}
 
-          {shouldShowTasksTab && <TaskMasterPanel isVisible={activeTab === 'tasks'} />}
-
           <div className={`h-full overflow-hidden ${activeTab === 'preview' ? 'block' : 'hidden'}`} />
         </div>
 
         <EditorSidebar
-          editingFile={activeTab === 'latex' ? null : editingFile}
+          editingFile={editingFile}
           isMobile={isMobile}
           editorExpanded={editorExpanded}
           editorWidth={editorWidth}

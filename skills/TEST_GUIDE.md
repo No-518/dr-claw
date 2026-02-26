@@ -73,7 +73,7 @@ prepare (with ideas) → code-survey (plan) → implementation-plan → ml-dev �
 请执行 inno-prepare-resources 技能。
 
 参数:
-- instance_path: /home/dingjie/workspace/medical/Medical_ai_scientist_idea/benchmark/final-med/nlp_qa/nlp_qa_1.json
+- instance: instance.json (or absolute path to instance file; paths in instance.json are **absolute** when the project is created by Vibe Lab; may be relative in older or hand-edited configs)
 - task_level: task2
 - category: nlp_qa
 
@@ -494,12 +494,12 @@ Experiment/analysis/logs/machine_learning_agent_iter_refine_1.json   → 改进�
 ```json
 {
   "project_path": "<project_path>",
-  "references_path": "<project_path>/Ideation/references/",
-  "ideas_path": "<project_path>/Ideation/ideas/",
-  "code_references_path": "<project_path>/Experiment/code_references/",
-  "datasets_path": "<project_path>/Experiment/datasets/",
-  "core_code_path": "<project_path>/Experiment/core_code/",
-  "analysis_path": "<project_path>/Experiment/analysis/",
+  "references_path": "<resolved from instance.Ideation.references — in Vibe Lab–created projects, instance paths are already absolute, so resolved may be the value as-is>",
+  "ideas_path": "<resolved from instance.Ideation.ideas — as above>",
+  "code_references_path": "<resolved from instance.Experiment.code_references — as above>",
+  "datasets_path": "<resolved from instance.Experiment.datasets — as above>",
+  "core_code_path": "<resolved from instance.Experiment.core_code — as above>",
+  "analysis_path": "<resolved from instance.Experiment.analysis — as above>",
   "date_limit": "2017-06-26",
   "prepare_result": {
     "reference_codebases": ["TorchGlove", "GloVe-PyTorch", "mikolov_word2vec", "SuperGluePretrainedNetwork", "entmax", "numerical-tours", "geomloss", "textdistance", "parser", "pytorch-struct"],

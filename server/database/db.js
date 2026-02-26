@@ -40,6 +40,22 @@ if (process.env.DATABASE_PATH) {
   }
 }
 
+// Migrate legacy local DB (repo install path) into the configured DB path.
+const LEGACY_DB_PATH = path.join(__dirname, 'auth.db');
+if (DB_PATH !== LEGACY_DB_PATH && !fs.existsSync(DB_PATH) && fs.existsSync(LEGACY_DB_PATH)) {
+  try {
+    fs.copyFileSync(LEGACY_DB_PATH, DB_PATH);
+    console.log(`[MIGRATION] Copied database from ${LEGACY_DB_PATH} to ${DB_PATH}`);
+    for (const suffix of ['-wal', '-shm']) {
+      if (fs.existsSync(LEGACY_DB_PATH + suffix)) {
+        fs.copyFileSync(LEGACY_DB_PATH + suffix, DB_PATH + suffix);
+      }
+    }
+  } catch (err) {
+    console.warn(`[MIGRATION] Could not copy legacy database: ${err.message}`);
+  }
+}
+
 // Create database connection
 const db = new Database(DB_PATH);
 
@@ -128,12 +144,12 @@ const userDb = {
     }
   },
 
-  // Update last login time
+  // Update last login time (non-fatal)
   updateLastLogin: (userId) => {
     try {
       db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
     } catch (err) {
-      throw err;
+      console.warn('Failed to update last login:', err.message);
     }
   },
 

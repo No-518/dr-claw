@@ -12,18 +12,20 @@ description: >
 
 ## Inputs
 
+Read from **`instance.json`**. Path values are **absolute** when the project is created by Vibe Lab; use as-is. If relative (e.g. hand-edited), resolve with `path.join(project_path, value)`.
+
 | Parameter              | Required | Description |
 |------------------------|----------|-------------|
-| `instance_path`        | Yes      | Path to the evaluation instance JSON file (contains `source_papers`, `task1`/`task2`, `url`, etc.) |
+| `instance`             | Yes      | Path to the instance JSON file (absolute in Vibe Lab). Use as-is to read the file. File contains `source_papers`, `task1`/`task2`, etc. |
 | `task_level`           | Yes      | Which task field to read from the instance — `"task1"` (Plan) or `"task2"` (Idea) |
-| `references_path`      | Yes      | Path to `Ideation/references/` — for downloaded papers and prepare logs |
-| `code_references_path` | Yes      | Path to `Experiment/code_references/` — for cloned repos |
-| `datasets_path`        | Yes      | Path to `Experiment/datasets/` — for dataset files |
+| `Ideation.references`  | Yes      | Path to Ideation references dir (absolute in Vibe Lab) — for downloaded papers and prepare logs |
+| `Experiment.code_references` | Yes | Path (absolute in Vibe Lab) — for cloned repos |
+| `Experiment.datasets`  | Yes      | Path (absolute in Vibe Lab) — for dataset files |
 | `category`             | Yes      | Research category tag (e.g. `nlp_qa`, `gnn`, `recommendation`). Used to locate the built-in dataset metaprompt |
 | `references`           | Yes      | A pre-formatted string listing all source papers from the instance |
 | `context_variables`    | Yes      | Shared context dictionary; this step will write `date_limit` into it |
 | `ideas`                | No       | Full innovative-idea / plan text. **Provide only in Plan mode** — when present the Prepare Agent query includes the ideas for more targeted repo selection |
-| `dataset_description`  | No       | Pre-built dataset description from the orchestrator (for custom / user-provided datasets). When provided, skip the metaprompt import in Step 3 |
+| `dataset_description`   | No       | Pre-built dataset description from the orchestrator (for custom / user-provided datasets). When provided, skip the metaprompt import in Step 3 |
 
 ## Outputs
 
@@ -84,7 +86,7 @@ Each tool output file records the function call arguments and result:
   "name": "download_arxiv_source_by_title",
   "args": {
     "paper_list": ["paper title 1", "paper title 2"],
-    "references_path": "<references_path>"
+    "references_path": "<instance.Ideation.references if absolute, else path.join(project_path, instance.Ideation.references)>"
   },
   "result": "<download result log string>"
 }
@@ -97,9 +99,9 @@ Each agent output file records the final context variables (no conversation mess
 ```json
 {
   "context_variables": {
-    "references_path": "<references_path>",
-    "code_references_path": "<code_references_path>",
-    "datasets_path": "<datasets_path>",
+    "references_path": "<use instance.Ideation.references as-is if absolute, else path.join(project_path, ...)>",
+    "code_references_path": "<use instance.Experiment.code_references as-is if absolute, else path.join(project_path, ...)>",
+    "datasets_path": "<use instance.Experiment.datasets as-is if absolute, else path.join(project_path, ...)>",
     "date_limit": "YYYY-MM-DD",
     "prepare_result": {
       "reference_codebases": ["repo1", "repo2"],
@@ -116,7 +118,7 @@ Each agent output file records the final context variables (no conversation mess
 
 ### Step 1 — Load the evaluation instance
 
-Call `load_instance(instance_path, task_level)`.
+Call `load_instance(instance.instance, task_level)` — when created by Vibe Lab, `instance.instance` is already absolute; otherwise resolve with `path.join(project_path, instance.instance)`.
 
 This reads the instance JSON and returns an **EvalMetadata** object containing:
 
@@ -247,7 +249,7 @@ Use bracket-matching JSON extraction — find the first complete `{…}` in the 
 
 ### Step 6 — Download arXiv paper sources
 
-Call `download_arxiv_source_by_title(paper_list, references_path)`.
+Call `download_arxiv_source_by_title(paper_list, references_path)` where `references_path` is `instance.Ideation.references` (absolute in Vibe Lab) or `path.join(project_path, instance.Ideation.references)` if relative.
 
 This searches arXiv for each paper title, downloads the LaTeX / source archive, and extracts it into `Ideation/references/papers/`. Record the result log as `download_res`.
 

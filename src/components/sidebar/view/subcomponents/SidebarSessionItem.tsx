@@ -137,9 +137,9 @@ export default function SidebarSessionItem({
           onClick={() => onSessionSelect(session, project.name)}
         >
           <div className="flex items-start gap-2 min-w-0 w-full">
-            <SessionProviderLogo provider={session.__provider} className="w-3 h-3 mt-0.5 flex-shrink-0" />
+            <SessionProviderLogo provider={session.__provider} className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium truncate text-foreground">{sessionView.sessionName}</div>
+              <div className="text-[14px] font-normal truncate text-foreground/90">{sessionView.sessionName}</div>
               <div className="flex items-center gap-1 mt-0.5">
                 <Clock className="w-2.5 h-2.5 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
