@@ -5,10 +5,10 @@
 </div>
 
 <p align="center">
-<a href="https://github.com/bbsngg/VibeLab-beta">
-<img src="https://img.shields.io/github/stars/bbsngg/VibeLab-beta?style=for-the-badge&logo=github" alt="GitHub Stars" />
+<a href="https://github.com/OpenLAIR/VibeLab">
+<img src="https://img.shields.io/github/stars/OpenLAIR/VibeLab?style=for-the-badge&logo=github" alt="GitHub Stars" />
 </a>
-<a href="https://github.com/bbsngg/VibeLab-beta/blob/main/LICENSE">
+<a href="https://github.com/OpenLAIR/VibeLab/blob/main/LICENSE">
 <img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge" alt="License" />
 </a>
 <a href="https://join.slack.com/t/vibe-lab-group/shared_invite/zt-3r4bkcx5t-iGyRMI~r09zt7p_ND2eP9A">
@@ -59,8 +59,8 @@ VibeLab 是一个面向不同研究方向的通用 AI 研究助手，帮助研�
 
 1. **克隆仓库：**
 ```bash
-git clone https://github.com/bbsngg/VibeLab-beta.git
-cd VibeLab-beta
+git clone https://github.com/OpenLAIR/VibeLab.git
+cd VibeLab
 ```
 
 2. **安装依赖：**

@@ -15,13 +15,13 @@
     "NOTICE",
     "LICENSE"
   ],
-  "homepage": "https://github.com/bbsngg/VibeLab-beta",
+  "homepage": "https://github.com/OpenLAIR/VibeLab",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bbsngg/VibeLab-beta.git"
+    "url": "git+https://github.com/OpenLAIR/VibeLab.git"
   },
   "bugs": {
-    "url": "https://github.com/bbsngg/VibeLab-beta/issues"
+    "url": "https://github.com/OpenLAIR/VibeLab/issues"
   },
   "scripts": {
     "dev": "concurrently --kill-others \"npm run server\" \"npm run client\"",

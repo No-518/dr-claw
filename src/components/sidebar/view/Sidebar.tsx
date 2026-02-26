@@ -41,8 +41,8 @@ function Sidebar({
   const { t } = useTranslation(['sidebar', 'common']);
   const { isPWA } = useDeviceSettings({ trackMobile: false });
   const { updateAvailable, latestVersion, currentVersion, releaseInfo, installMode } = useVersionCheck(
-    'bbsngg',
-    'VibeLab-beta',
+    'OpenLAIR',
+    'VibeLab',
   );
   const { preferences, setPreference } = useUiPreferences();
   const { sidebarVisible } = preferences;
