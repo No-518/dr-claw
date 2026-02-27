@@ -55,6 +55,11 @@
     "title": "생각 중...",
     "emoji": "💭 생각 중..."
   },
+  "agentTurn": {
+    "thought": "사고",
+    "usedTools": "{{count}}개 도구 사용",
+    "steps": "에이전트 단계"
+  },
   "json": {
     "response": "JSON 응답"
   },

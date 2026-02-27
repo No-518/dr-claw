@@ -55,6 +55,11 @@
     "title": "Thinking...",
     "emoji": "💭 Thinking..."
   },
+  "agentTurn": {
+    "thought": "Thought",
+    "usedTools": "Used {{count}} tools",
+    "steps": "Agent steps"
+  },
   "json": {
     "response": "JSON Response"
   },

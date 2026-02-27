@@ -1,13 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 
 import MessageComponent from './MessageComponent';
+import AgentTurnContainer from './AgentTurnContainer';
 import ProviderSelectionEmptyState from './ProviderSelectionEmptyState';
 import type { ChatMessage } from '../../types/types';
 import type { Project, ProjectSession, SessionProvider } from '../../../../types/app';
 import AssistantThinkingIndicator from './AssistantThinkingIndicator';
 import { getIntrinsicMessageKey } from '../../utils/messageKeys';
+import { groupMessagesIntoTurns } from '../../utils/groupAgentTurns';
 
 interface ChatMessagesPaneProps {
   scrollContainerRef: RefObject<HTMLDivElement>;
@@ -125,6 +127,11 @@ export default function ChatMessagesPane({
     return candidateKey;
   }, []);
 
+  const groupedItems = useMemo(
+    () => groupMessagesIntoTurns(visibleMessages, isLoading),
+    [visibleMessages, isLoading]
+  );
+
   return (
     <div
       ref={scrollContainerRef}
@@ -235,14 +242,32 @@ export default function ChatMessagesPane({
             </div>
           )}
 
-          {visibleMessages.map((message, index) => {
-            const prevMessage = index > 0 ? visibleMessages[index - 1] : null;
+          {groupedItems.map((item, index) => {
+            if (item.kind === 'user' || item.kind === 'standalone') {
+              return (
+                <MessageComponent
+                  key={getMessageKey(item.message)}
+                  message={item.message}
+                  index={index}
+                  prevMessage={null}
+                  createDiff={createDiff}
+                  onFileOpen={onFileOpen}
+                  onShowSettings={onShowSettings}
+                  onGrantToolPermission={onGrantToolPermission}
+                  autoExpandTools={autoExpandTools}
+                  showRawParameters={showRawParameters}
+                  showThinking={showThinking}
+                  selectedProject={selectedProject}
+                  provider={provider}
+                />
+              );
+            }
+            // kind === 'agent-turn'
             return (
-              <MessageComponent
-                key={getMessageKey(message)}
-                message={message}
-                index={index}
-                prevMessage={prevMessage}
+              <AgentTurnContainer
+                key={`agent-turn-${index}`}
+                turn={item}
+                getMessageKey={getMessageKey}
                 createDiff={createDiff}
                 onFileOpen={onFileOpen}
                 onShowSettings={onShowSettings}

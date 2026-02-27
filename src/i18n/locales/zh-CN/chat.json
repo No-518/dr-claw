@@ -55,6 +55,11 @@
     "title": "思考中...",
     "emoji": "💭 思考中..."
   },
+  "agentTurn": {
+    "thought": "思考",
+    "usedTools": "使用了 {{count}} 个工具",
+    "steps": "执行步骤"
+  },
   "json": {
     "response": "JSON 响应"
   },
