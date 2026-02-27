@@ -17,6 +17,10 @@
     "inno-rclone-to-overleaf": { "zh": "阶段: 发布同步", "en": "Stage: Publication Sync", "ko": "단계: 배포 동기화" },
     "inno-figure-gen": { "zh": "阶段: 论文撰写", "en": "Stage: Paper Writing", "ko": "단계: 논문 작성" },
     "bioinformatics-init-analysis": { "zh": "阶段: 实验分析", "en": "Stage: Analysis", "ko": "단계: 분석" },
+    "biorxiv-database": { "zh": "阶段: 资源准备", "en": "Stage: Resource Prep", "ko": "단계: 리소스 준비" },
+    "scientific-writing": { "zh": "阶段: 论文撰写", "en": "Stage: Paper Writing", "ko": "단계: 논문 작성" },
+    "academic-researcher": { "zh": "阶段: 调研", "en": "Stage: Survey", "ko": "단계: 조사" },
+    "research-grants": { "zh": "阶段: 论文撰写", "en": "Stage: Paper Writing", "ko": "단계: 논문 작성" },
 
     "accelerate": { "zh": "类别: 训练与调优", "en": "Category: Training & Tuning", "ko": "카테고리: 훈련 및 튜닝" },
     "deepspeed": { "zh": "类别: 训练与调优", "en": "Category: Training & Tuning", "ko": "카테고리: 훈련 및 튜닝" },
@@ -174,6 +178,10 @@
     "brainstorming-research-ideas": { "zh": "领域: cs", "en": "Domain: cs", "ko": "영역: cs" },
     "creative-thinking-for-research": { "zh": "领域: cs", "en": "Domain: cs", "ko": "영역: cs" },
     "ml-paper-writing": { "zh": "领域: cs", "en": "Domain: cs", "ko": "영역: cs" },
+    "biorxiv-database": { "zh": "领域: q-bio", "en": "Domain: q-bio", "ko": "영역: q-bio" },
+    "scientific-writing": { "zh": "领域: cs", "en": "Domain: cs", "ko": "영역: cs" },
+    "academic-researcher": { "zh": "领域: cs", "en": "Domain: cs", "ko": "영역: cs" },
+    "research-grants": { "zh": "领域: cs", "en": "Domain: cs", "ko": "영역: cs" },
 
     "dspy": { "zh": "领域: cs", "en": "Domain: cs", "ko": "영역: cs" },
     "guidance": { "zh": "领域: cs", "en": "Domain: cs", "ko": "영역: cs" },
@@ -222,6 +230,7 @@
     "inno-research-orchestrator"
   ],
   "domainCsAiExceptions": [
-    "bioinformatics-init-analysis"
+    "bioinformatics-init-analysis",
+    "biorxiv-database"
   ]
 }

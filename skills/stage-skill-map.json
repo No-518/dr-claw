@@ -6,19 +6,24 @@
       "inno-deep-research",
       "dataset-discovery",
       "inno-idea-generation",
-      "inno-idea-eval"
+      "inno-idea-eval",
+      "biorxiv-database",
+      "academic-researcher"
     ],
     "byTaskType": {
       "analysis": [
         "inno-research-orchestrator",
         "inno-idea-eval",
-        "inno-deep-research"
+        "inno-deep-research",
+        "academic-researcher"
       ],
       "exploration": [
         "inno-idea-generation",
         "inno-code-survey",
         "inno-deep-research",
-        "dataset-discovery"
+        "dataset-discovery",
+        "biorxiv-database",
+        "academic-researcher"
       ],
       "implementation": [
         "inno-prepare-resources"
@@ -45,7 +50,8 @@
       "exploration": [
         "inno-code-survey",
         "dataset-discovery",
-        "inno-deep-research"
+        "inno-deep-research",
+        "biorxiv-database"
       ]
     }
   },
@@ -56,13 +62,19 @@
       "inno-paper-reviewer",
       "inno-humanizer",
       "inno-reference-audit",
-      "inno-rclone-to-overleaf"
+      "inno-rclone-to-overleaf",
+      "scientific-writing",
+      "ml-paper-writing",
+      "research-grants"
     ],
     "byTaskType": {
       "writing": [
         "inno-paper-writing",
         "inno-figure-gen",
-        "inno-humanizer"
+        "inno-humanizer",
+        "scientific-writing",
+        "ml-paper-writing",
+        "research-grants"
       ],
       "analysis": [
         "inno-paper-reviewer",
