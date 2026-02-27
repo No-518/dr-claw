@@ -1,6 +1,6 @@
 ---
 name: inno-pipeline-planner
-description: Guides the user through an interactive conversation to define their research project, then generates research_brief.json and tasks.json. Use when starting a new project, when no research_brief.json exists, or when the user wants to redefine their research pipeline.
+description: Guides the user through an interactive conversation to define their research project, then generates research_brief.json and tasks.json. Use when starting a new project, when no research_brief.json exists, when the user wants to start from a specific pipeline stage, or when the user wants to redefine their research pipeline.
 ---
 
 # Inno Pipeline Planner
@@ -32,10 +32,12 @@ Check:
 - `.pipeline/docs/research_brief.json`
 - `.pipeline/tasks/tasks.json`
 - `instance.json` (legacy source)
+- Content in `Ideation/`, `Experiment/`, `Publication/` directories (to detect pre-existing artifacts)
 
-If brief exists, summarize title, goal, and completion status, then ask:
+If brief exists, summarize title, goal, current `startStage`, and completion status, then ask:
 - Refine existing brief/tasks
 - Regenerate from scratch
+- Change the starting stage
 
 ## 2) Collect project context via conversation
 
@@ -44,6 +46,13 @@ Capture at least:
 - Goal or hypothesis
 - Success criteria or evaluation signal
 
+**Determine the starting stage** early in the conversation:
+- Ask what the user already has: "Do you already have a research idea, experimental results, or are you starting from scratch?"
+- If the user has a concrete idea with problem framing and success criteria -> `startStage = "experiment"`
+- If the user has experimental results and analysis -> `startStage = "publication"`
+- If the user is starting from scratch or only has a vague direction -> `startStage = "ideation"` (default)
+- Detect automatically from conversation context (e.g., "I already ran all experiments" implies publication).
+
 Typical question buckets:
 - Project identity: topic, prior paper/method/dataset, target venue (optional)
 - Scope and method: core question, approach, expected outcome
@@ -51,6 +60,7 @@ Typical question buckets:
 
 Adapt to context:
 - Skip already-provided details.
+- **Skip questions for stages before `startStage`**: If starting from experiment, do not ask ideation questions in detail — just capture a brief summary of the existing idea for the brief's ideation section.
 - If exploratory, keep experiment/publication sections lightweight.
 - If user provides concrete plan, prepare for `pipeline.mode = "plan"`; otherwise use `"idea"`.
 
@@ -65,6 +75,9 @@ Use the exact JSON contracts and generation rules in:
 - `references/pipeline-contract.md` and linked reference files
 
 Rules:
+- Set `pipeline.startStage` to the determined starting stage (default: `"ideation"`).
+- **Generate tasks only for stages >= `startStage`** in the stage order (ideation < experiment < publication).
+- For skipped stages: still populate their `sections.*` fields in the brief with whatever context the user provided, but do not create task blueprints or tasks for them.
 - Tailor blueprint titles/descriptions to the user topic (never generic filler).
 - Keep quality gates domain-appropriate.
 - Resolve recommended skills from local available skills (`.agents/skills/` or `skills/`), optionally using `stage-skill-map.json` if present.
@@ -72,8 +85,8 @@ Rules:
 ## 4) Summarize and confirm next action
 
 After writing files, present:
-- Brief summary (title, goal, filled vs missing sections)
-- Task overview (count by stage + first 2-3 task titles per stage)
+- Brief summary (title, goal, starting stage, filled vs missing sections)
+- Task overview (count by stage + first 2-3 task titles per stage) — only for active stages
 - Recommended first task and why
 
 ## 5) Handle iteration requests
@@ -81,4 +94,5 @@ After writing files, present:
 If user asks for updates:
 - Update brief content directly when only text/content changes.
 - Regenerate `tasks.json` when pipeline structure/blueprints/stages change.
+- **If user asks to change the starting stage**: update `pipeline.startStage` in the brief, then regenerate `tasks.json` to include only the active stages.
 - If asked to add one task only, append a single task with next numeric `id` instead of full regeneration.

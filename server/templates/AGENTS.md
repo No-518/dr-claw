@@ -14,18 +14,26 @@ Your responsibilities:
 ## When You Start a Conversation
 
 1. Read `instance.json` in the project root to understand the project's current state (if it exists).
-2. Read `.pipeline/docs/research_brief.json` to understand the research brief — topic, goals, and pipeline stage definitions.
+2. Read `.pipeline/docs/research_brief.json` to understand the research brief — topic, goals, pipeline stage definitions, and `pipeline.startStage` (which stage the user wants to begin from).
 3. Read `.pipeline/tasks/tasks.json` to see which tasks exist and their current status (pending, in-progress, done, review, deferred, cancelled).
 4. Check which pipeline directories already have content (`Ideation/`, `Experiment/`, `Publication/`, `Research/`). Note: `Research/` holds deep-research reports and is not a pipeline stage.
-5. Briefly orient the user: tell them what stage the project is at, which task is next, and what the next logical step is.
+5. Determine the **effective starting stage**: check `pipeline.startStage` in the research brief (defaults to `"ideation"` if absent). If directories for later stages already have content but earlier ones are empty, the user likely intends to start from a later stage.
+6. Briefly orient the user: tell them the project's starting stage, which stages are active, which task is next, and what the next logical step is.
 
-**If no `research_brief.json` exists**, proactively offer to set up the research pipeline. Read `.agents/skills/inno-pipeline-planner/SKILL.md` and follow its procedure to collect the user's research intent through conversation and generate both `research_brief.json` and `tasks.json`.
+### When to run `inno-pipeline-planner`
+
+Read `.agents/skills/inno-pipeline-planner/SKILL.md` and follow its procedure in any of these situations:
+
+- **No `research_brief.json` exists** — proactively offer to set up the research pipeline through conversation.
+- **No `tasks.json` exists** (but brief does) — generate tasks from the existing brief.
+- **User wants to change the starting stage** — e.g., "I already have results, I just need to write the paper." Re-run the planner to update `pipeline.startStage` and regenerate tasks for the active stages only.
+- **User explicitly asks** to redefine or regenerate the pipeline.
 
 ## Project Workflow
 
 The user drives the pipeline through the VibeLab web UI. Chat is the default landing page:
 
-1. **Chat (you)** — The user describes their research idea or goal. You run the `inno-pipeline-planner` skill to interactively collect requirements and generate `.pipeline/docs/research_brief.json` and `.pipeline/tasks/tasks.json`.
+1. **Chat (you)** — The user describes their research idea, goal, or current progress. You run the `inno-pipeline-planner` skill to interactively collect requirements, determine the appropriate starting stage, and generate `.pipeline/docs/research_brief.json` and `.pipeline/tasks/tasks.json`. If the user indicates they already have artifacts for earlier stages (e.g., "I have an idea and datasets ready, I need to run experiments"), set `pipeline.startStage` accordingly and generate tasks only for the active stages.
 2. **Research Lab** — The user reviews the generated tasks, progress metrics, and research artifacts in the Research Lab tab.
 3. **Chat (you)** — The user clicks "Go to Chat" on a task in the Research Lab to send it to you. You execute the task using the appropriate skills and write results back to the project.
 
@@ -33,16 +41,22 @@ When the user sends you a task from the Pipeline Task List, treat it as your cur
 
 ## Pipeline Stages
 
-The pipeline has three stages, each with its own quality gates:
+The pipeline has three stages. Users do not have to start from Ideation — they can enter the pipeline at any stage depending on what they already have.
 
 **Ideation** — Define research directions, generate and evaluate ideas, establish problem framing and success criteria.
 Output directories: `Ideation/ideas/`, `Ideation/references/`
+*Skip if*: User already has a concrete research idea, problem framing, and success criteria.
 
 **Experiment** — Design and run experiments, implement code, analyze results.
 Output directories: `Experiment/code_references/`, `Experiment/datasets/`, `Experiment/core_code/`, `Experiment/analysis/`
+*Skip if*: User already has experimental results and analysis.
+*Pre-existing input accepted*: Research idea/hypothesis, method description, dataset references.
 
 **Publication** — Write the paper, prepare figures/tables, finalize submission artifacts.
 Output directories: `Publication/paper/`, `Publication/homepage/`, `Publication/slide/`
+*Pre-existing input accepted*: Experimental results, analysis, figures, code artifacts.
+
+The `pipeline.startStage` field in `research_brief.json` controls which stage the pipeline begins from. Tasks are only generated for the starting stage and all subsequent stages.
 
 ## How to Use Skills
 
@@ -63,7 +77,7 @@ If no suggested skills appear in the prompt, or the user makes a freeform reques
 ## Key Files
 
 - `instance.json` — Project path mapping. It stores absolute directory paths for each pipeline area (`Ideation.*`, `Experiment.*`, `Publication.*`) and related project metadata. Use these paths as the canonical locations for file I/O.
-- `.pipeline/docs/research_brief.json` — Research process control document and single source of truth. It defines stage goals, required elements, quality gates, task blueprints, and recommended skills, and should be updated as the work evolves.
+- `.pipeline/docs/research_brief.json` — Research process control document and single source of truth. It defines stage goals, required elements, quality gates, task blueprints, recommended skills, and `pipeline.startStage` (which stage to begin from). Should be updated as the work evolves.
 - `.pipeline/tasks/tasks.json` — The task list generated from the research brief. Each task has: `id`, `title`, `description`, `status` (pending, in-progress, done, review, deferred, cancelled), `stage`, `priority`, `dependencies`, `taskType`, `inputsNeeded`, `suggestedSkills`, and `nextActionPrompt`. Read this to understand what needs to be done.
 - `.pipeline/config.json` — Pipeline configuration metadata.
 

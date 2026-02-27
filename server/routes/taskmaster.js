@@ -635,7 +635,12 @@ function instantiatePipelineTasksFromBrief(briefData = {}, numTasks = DEFAULT_MA
     const generated = [];
     const maxTasks = Number.isFinite(Number(numTasks)) && Number(numTasks) > 0 ? Number(numTasks) : DEFAULT_MAX_TASKS;
 
-    for (const stage of STAGE_ORDER) {
+    // Respect pipeline.startStage — only generate tasks for stages >= startStage
+    const startStage = briefData?.pipeline?.startStage || 'ideation';
+    const startIdx = STAGE_ORDER.indexOf(startStage);
+    const activeStages = startIdx > 0 ? STAGE_ORDER.slice(startIdx) : STAGE_ORDER;
+
+    for (const stage of activeStages) {
         const stageConfig = pipelineStages?.[stage];
         if (!stageConfig || typeof stageConfig !== 'object') continue;
 

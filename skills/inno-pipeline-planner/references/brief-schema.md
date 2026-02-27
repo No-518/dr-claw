@@ -35,6 +35,7 @@ Canonical contract for `.pipeline/docs/research_brief.json`.
   "pipeline": {
     "version": "1.1",
     "mode": "idea",
+    "startStage": "ideation",
     "stages": {
       "ideation": {
         "required_elements": [

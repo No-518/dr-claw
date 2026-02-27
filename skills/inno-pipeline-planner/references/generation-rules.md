@@ -30,20 +30,28 @@ Create when missing:
 - Fill content from user conversation and existing project files only.
 - Leave unknown fields as empty string or empty array.
 - Set `pipeline.mode`:
-- Use `"plan"` when user provides concrete method/architecture/training plan.
-- Use `"idea"` otherwise.
+  - Use `"plan"` when user provides concrete method/architecture/training plan.
+  - Use `"idea"` otherwise.
+- Set `pipeline.startStage`:
+  - Use `"ideation"` (default) when user is starting from scratch.
+  - Use `"experiment"` when user already has a research idea, problem framing, and success criteria.
+  - Use `"publication"` when user already has experimental results and analysis.
 - Make `task_blueprints` and `quality_gate` domain-specific to the topic.
+- For skipped stages (before `startStage`): still populate `sections.*` with whatever context the user provided, but `task_blueprints` in those stages will not produce tasks.
 
 ## Task generation rules
 
-1. Create tasks from each stage's `task_blueprints`.
-2. Create define/refine tasks for each `required_element`:
-- Use `Define <field>` when empty.
-- Use `Refine <field>` when already populated.
-3. Add one quality-gate review task at the end of each stage with `quality_gate`.
-4. Order tasks by execution flow:
-- exploration -> implementation -> analysis -> writing
-5. Add dependencies when obvious (for example, implementation depends on exploration in the same stage).
+Stage order: `ideation` < `experiment` < `publication`.
+
+1. **Only generate tasks for stages >= `pipeline.startStage`**. Skip earlier stages entirely during task generation.
+2. Create tasks from each active stage's `task_blueprints`.
+3. Create define/refine tasks for each `required_element` in active stages:
+   - Use `Define <field>` when empty.
+   - Use `Refine <field>` when already populated.
+4. Add one quality-gate review task at the end of each active stage with `quality_gate`.
+5. Order tasks by execution flow:
+   - exploration -> implementation -> analysis -> writing
+6. Add dependencies when obvious (for example, implementation depends on exploration in the same stage).
 
 ## `nextActionPrompt` template
 
