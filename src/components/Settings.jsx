@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import CredentialsSettings from './CredentialsSettings';
 import GitSettings from './GitSettings';
 import LoginModal from './LoginModal';
-import { authenticatedFetch } from '../utils/api';
+import { authenticatedFetch, api } from '../utils/api';
 import { isTelemetryEnabled, setTelemetryEnabled } from '../utils/telemetry';
 
 // New settings components
@@ -79,6 +79,12 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
     localStorage.getItem('codeEditorFontSize') || '14'
   );
   const [telemetryEnabled, setTelemetryEnabledState] = useState(() => isTelemetryEnabled());
+
+  // Workspace root settings
+  const [workspaceRoot, setWorkspaceRoot] = useState('');
+  const [workspaceRootDefault, setWorkspaceRootDefault] = useState('');
+  const [workspaceRootSaved, setWorkspaceRootSaved] = useState(false);
+  const [workspaceRootError, setWorkspaceRootError] = useState('');
   
   // Cursor-specific states
   const [cursorAllowedCommands, setCursorAllowedCommands] = useState([]);
@@ -581,6 +587,18 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         setCodexPermissionMode('default');
       }
 
+      // Load workspace root setting
+      try {
+        const wsResponse = await api.getWorkspaceRoot();
+        if (wsResponse.ok) {
+          const wsData = await wsResponse.json();
+          setWorkspaceRoot(wsData.path || '');
+          setWorkspaceRootDefault(wsData.defaultPath || '');
+        }
+      } catch (err) {
+        console.error('Error loading workspace root:', err);
+      }
+
       // Load MCP servers from API
       await fetchMcpServers();
 
@@ -767,6 +785,28 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const saveWorkspaceRoot = async (newPath) => {
+    setWorkspaceRootError('');
+    setWorkspaceRootSaved(false);
+    try {
+      const response = await api.setWorkspaceRoot(newPath || null);
+      const data = await response.json();
+      if (response.ok) {
+        setWorkspaceRoot(data.path);
+        setWorkspaceRootSaved(true);
+        setTimeout(() => setWorkspaceRootSaved(false), 2000);
+      } else {
+        setWorkspaceRootError(data.error || t('appearanceSettings.defaultProjectPath.invalidPath'));
+      }
+    } catch (err) {
+      setWorkspaceRootError(err.message);
+    }
+  };
+
+  const resetWorkspaceRoot = () => {
+    saveWorkspaceRoot(null);
   };
 
   const addAllowedTool = (tool) => {
@@ -1133,6 +1173,62 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
       </div>
     </div>
 
+    {/* Default Project Path */}
+    <div className="space-y-4">
+      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="mb-2">
+          <div className="font-medium text-foreground">
+            {t('appearanceSettings.defaultProjectPath.label')}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {t('appearanceSettings.defaultProjectPath.description')}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mt-3">
+          <Input
+            value={workspaceRoot}
+            onChange={(e) => {
+              setWorkspaceRoot(e.target.value);
+              setWorkspaceRootSaved(false);
+              setWorkspaceRootError('');
+            }}
+            onBlur={() => {
+              if (workspaceRoot && workspaceRoot !== workspaceRootDefault) {
+                saveWorkspaceRoot(workspaceRoot);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                saveWorkspaceRoot(workspaceRoot);
+              }
+            }}
+            placeholder={workspaceRootDefault}
+            className="flex-1 text-sm font-mono"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetWorkspaceRoot}
+            className="whitespace-nowrap"
+            title={t('appearanceSettings.defaultProjectPath.reset')}
+          >
+            {t('appearanceSettings.defaultProjectPath.reset')}
+          </Button>
+        </div>
+        {workspaceRootSaved && (
+          <div className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+            <Check className="w-3 h-3" />
+            {t('appearanceSettings.defaultProjectPath.saved')}
+          </div>
+        )}
+        {workspaceRootError && (
+          <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+            {workspaceRootError}
+          </div>
+        )}
+      </div>
+    </div>
+
     {/* Code Editor Settings */}
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-foreground">{t('appearanceSettings.codeEditor.title')}</h3>
@@ -1306,20 +1402,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                       onClick={() => setSelectedAgent('claude')}
                       isMobile={true}
                     />
-                    <AgentListItem
-                      agentId="cursor"
-                      authStatus={cursorAuthStatus}
-                      isSelected={selectedAgent === 'cursor'}
-                      onClick={() => setSelectedAgent('cursor')}
-                      isMobile={true}
-                    />
-                    <AgentListItem
-                      agentId="codex"
-                      authStatus={codexAuthStatus}
-                      isSelected={selectedAgent === 'codex'}
-                      onClick={() => setSelectedAgent('codex')}
-                      isMobile={true}
-                    />
+                    {/* Cursor and Codex temporarily hidden — will re-add when content is ready */}
                   </div>
                 </div>
 
@@ -1332,18 +1415,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                       isSelected={selectedAgent === 'claude'}
                       onClick={() => setSelectedAgent('claude')}
                     />
-                    <AgentListItem
-                      agentId="cursor"
-                      authStatus={cursorAuthStatus}
-                      isSelected={selectedAgent === 'cursor'}
-                      onClick={() => setSelectedAgent('cursor')}
-                    />
-                    <AgentListItem
-                      agentId="codex"
-                      authStatus={codexAuthStatus}
-                      isSelected={selectedAgent === 'codex'}
-                      onClick={() => setSelectedAgent('codex')}
-                    />
+                    {/* Cursor and Codex temporarily hidden — will re-add when content is ready */}
                   </div>
                 </div>
 

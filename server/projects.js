@@ -2185,6 +2185,23 @@ async function deleteCodexSession(sessionId) {
   }
 }
 
+// Get workspace root from project config
+async function getWorkspaceRootFromConfig() {
+  const config = await loadProjectConfig();
+  return config._workspacesRoot || null;
+}
+
+// Save workspace root to project config
+async function setWorkspaceRootInConfig(workspacesRoot) {
+  const config = await loadProjectConfig();
+  if (workspacesRoot) {
+    config._workspacesRoot = workspacesRoot;
+  } else {
+    delete config._workspacesRoot;
+  }
+  await saveProjectConfig(config);
+}
+
 export {
   getProjects,
   getSessions,
@@ -2202,5 +2219,7 @@ export {
   getCodexSessions,
   getCodexSessionMessages,
   deleteCodexSession,
-  ensureProjectSkillLinks
+  ensureProjectSkillLinks,
+  getWorkspaceRootFromConfig,
+  setWorkspaceRootInConfig
 };

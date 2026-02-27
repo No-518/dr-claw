@@ -447,6 +447,30 @@ export function useChatRealtimeHandlers({
           // Collect all tool results, then apply in a single update
           const toolResults = structuredMessageData.content.filter((part: any) => part.type === 'tool_result');
 
+          // Handle text content in user messages (skill/command content)
+          const textParts = structuredMessageData.content.filter((part: any) => part.type === 'text');
+          if (textParts.length > 0) {
+            const textContent = textParts.map((p: any) => p.text || '').join('\n');
+            const isSkillText =
+              textContent.includes('Base directory for this skill:') ||
+              textContent.startsWith('<command-name>') ||
+              textContent.startsWith('<command-message>') ||
+              textContent.startsWith('<command-args>') ||
+              textContent.startsWith('<local-command-stdout>') ||
+              (toolResults.length > 0 && !textContent.startsWith('<system-reminder>'));
+            if (isSkillText && textContent.trim()) {
+              setChatMessages((previous) => [
+                ...previous,
+                {
+                  type: 'user',
+                  content: textContent,
+                  timestamp: new Date(),
+                  isSkillContent: true,
+                },
+              ]);
+            }
+          }
+
           if (toolResults.length > 0) {
             setChatMessages((previous) =>
               previous.map((message) => {

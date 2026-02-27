@@ -60,6 +60,9 @@
     "usedTools": "Used {{count}} tools",
     "steps": "Agent steps"
   },
+  "skill": {
+    "contentLoaded": "Skill Content Loaded"
+  },
   "json": {
     "response": "JSON Response"
   },

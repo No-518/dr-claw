@@ -129,6 +129,8 @@ When you first open VibeLab you will see the **Projects** sidebar. You have two 
 - **Open an existing project** — VibeLab auto-discovers projects from Claude Code, Cursor, and Codex sessions. Click any listed project to open it.
 - **Create a new project** — Click the **"+"** button, choose a directory on your machine, and VibeLab will set up the workspace: `.claude/`, `.agents/`, `.cursor/` (with `skills/` symlinked from the app), preset dirs (`Ideation/ideas`, `Ideation/references`, `Experiment/code_references`, `Experiment/datasets`, `Experiment/core_code`, `Experiment/analysis`, `Publication/paper`, `Publication/homepage`, `Publication/slide`), and **instance.json** at the project root with absolute paths for those directories.
 
+> **Default project storage path:** New projects are stored under `~/vibelab` by default. You can change this in **Settings → Appearance → Default Project Path**, or set the `WORKSPACES_ROOT` environment variable. The setting is persisted in `~/.claude/project-config.json`.
+
 ### Step 2 — Generate Your Research Pipeline via Chat
 
 After creating or opening a project, VibeLab opens **Chat** by default. If no research pipeline exists yet, an onboarding banner appears with a **Use in Chat** button that injects a starter prompt.

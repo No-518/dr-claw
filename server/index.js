@@ -57,7 +57,7 @@ import mcpUtilsRoutes from './routes/mcp-utils.js';
 import commandsRoutes from './routes/commands.js';
 import settingsRoutes from './routes/settings.js';
 import agentRoutes from './routes/agent.js';
-import projectsRoutes, { WORKSPACES_ROOT, validateWorkspacePath } from './routes/projects.js';
+import projectsRoutes, { WORKSPACES_ROOT, getWorkspacesRoot, validateWorkspacePath } from './routes/projects.js';
 import cliAuthRoutes from './routes/cli-auth.js';
 import userRoutes from './routes/user.js';
 import codexRoutes from './routes/codex.js';
@@ -603,13 +603,14 @@ app.post('/api/projects/create', authenticateToken, async (req, res) => {
     }
 });
 
-const expandWorkspacePath = (inputPath) => {
+const expandWorkspacePath = async (inputPath) => {
     if (!inputPath) return inputPath;
+    const root = await getWorkspacesRoot();
     if (inputPath === '~') {
-        return WORKSPACES_ROOT;
+        return root;
     }
     if (inputPath.startsWith('~/') || inputPath.startsWith('~\\')) {
-        return path.join(WORKSPACES_ROOT, inputPath.slice(2));
+        return path.join(root, inputPath.slice(2));
     }
     return inputPath;
 };
@@ -620,10 +621,10 @@ app.get('/api/browse-filesystem', authenticateToken, async (req, res) => {
         const { path: dirPath } = req.query;
 
         console.log('[API] Browse filesystem request for path:', dirPath);
-        console.log('[API] WORKSPACES_ROOT is:', WORKSPACES_ROOT);
-        // Default to home directory if no path provided
-        const defaultRoot = WORKSPACES_ROOT;
-        let targetPath = dirPath ? expandWorkspacePath(dirPath) : defaultRoot;
+        const defaultRoot = await getWorkspacesRoot();
+        console.log('[API] Workspace root is:', defaultRoot);
+        // Default to workspace root if no path provided
+        let targetPath = dirPath ? await expandWorkspacePath(dirPath) : defaultRoot;
 
         // Resolve and normalize the path
         targetPath = path.resolve(targetPath);
@@ -701,7 +702,7 @@ app.post('/api/create-folder', authenticateToken, async (req, res) => {
         if (!folderPath) {
             return res.status(400).json({ error: 'Path is required' });
         }
-        const expandedPath = expandWorkspacePath(folderPath);
+        const expandedPath = await expandWorkspacePath(folderPath);
         const resolvedInput = path.resolve(expandedPath);
         const validation = await validateWorkspacePath(resolvedInput);
         if (!validation.valid) {
@@ -2288,7 +2289,8 @@ async function startServer() {
             console.log('');
 
             // Ensure the workspaces root directory exists
-            await fsPromises.mkdir(WORKSPACES_ROOT, { recursive: true });
+            const startupWorkspaceRoot = await getWorkspacesRoot();
+            await fsPromises.mkdir(startupWorkspaceRoot, { recursive: true });
 
             // Start watching the projects folder for changes
             await setupProjectsWatcher();

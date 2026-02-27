@@ -178,6 +178,14 @@ export const api = {
       }),
   },
 
+  // Workspace root
+  getWorkspaceRoot: () => authenticatedFetch('/api/projects/workspace-root'),
+  setWorkspaceRoot: (path) =>
+    authenticatedFetch('/api/projects/workspace-root', {
+      method: 'PUT',
+      body: JSON.stringify({ path }),
+    }),
+
   // Browse filesystem for project suggestions
   browseFilesystem: (dirPath = null) => {
     const params = new URLSearchParams();

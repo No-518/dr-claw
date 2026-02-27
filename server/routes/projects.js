@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import os from 'os';
-import { addProjectManually } from '../projects.js';
+import { addProjectManually, getWorkspaceRootFromConfig, setWorkspaceRootInConfig } from '../projects.js';
 
 const router = express.Router();
 
@@ -12,8 +12,17 @@ function sanitizeGitError(message, token) {
   return message.replace(new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '***');
 }
 
-// Configure allowed workspace root (defaults to user's home directory)
-export const WORKSPACES_ROOT = process.env.WORKSPACES_ROOT || os.homedir();
+// Default workspace root: ~/vibelab
+const DEFAULT_WORKSPACES_ROOT = path.join(os.homedir(), 'vibelab');
+
+// Dynamic workspace root: config file > env var > ~/vibelab
+export async function getWorkspacesRoot() {
+  const configRoot = await getWorkspaceRootFromConfig();
+  return configRoot || process.env.WORKSPACES_ROOT || DEFAULT_WORKSPACES_ROOT;
+}
+
+// Keep a synchronous fallback for backward compat (used only at import time)
+export const WORKSPACES_ROOT = process.env.WORKSPACES_ROOT || DEFAULT_WORKSPACES_ROOT;
 
 // System-critical paths that should never be used as workspace directories
 export const FORBIDDEN_PATHS = [
@@ -111,14 +120,15 @@ export async function validateWorkspacePath(requestedPath) {
     }
 
     // Resolve the workspace root to its real path
-    const resolvedWorkspaceRoot = await fs.realpath(WORKSPACES_ROOT);
+    const currentWorkspacesRoot = await getWorkspacesRoot();
+    const resolvedWorkspaceRoot = await fs.realpath(currentWorkspacesRoot);
 
     // Ensure the resolved path is contained within the allowed workspace root
     if (!realPath.startsWith(resolvedWorkspaceRoot + path.sep) &&
         realPath !== resolvedWorkspaceRoot) {
       return {
         valid: false,
-        error: `Workspace path must be within the allowed workspace root: ${WORKSPACES_ROOT}`
+        error: `Workspace path must be within the allowed workspace root: ${currentWorkspacesRoot}`
       };
     }
 
@@ -160,6 +170,65 @@ export async function validateWorkspacePath(requestedPath) {
     };
   }
 }
+
+/**
+ * Get current workspace root path
+ * GET /api/projects/workspace-root
+ */
+router.get('/workspace-root', async (req, res) => {
+  try {
+    const currentRoot = await getWorkspacesRoot();
+    const defaultRoot = process.env.WORKSPACES_ROOT || DEFAULT_WORKSPACES_ROOT;
+    res.json({ path: currentRoot, defaultPath: defaultRoot });
+  } catch (error) {
+    console.error('Error getting workspace root:', error);
+    res.status(500).json({ error: 'Failed to get workspace root' });
+  }
+});
+
+/**
+ * Set workspace root path
+ * PUT /api/projects/workspace-root
+ */
+router.put('/workspace-root', async (req, res) => {
+  try {
+    const { path: newPath } = req.body;
+
+    // If null/empty, reset to default
+    if (!newPath) {
+      await setWorkspaceRootInConfig(null);
+      const defaultRoot = process.env.WORKSPACES_ROOT || DEFAULT_WORKSPACES_ROOT;
+      return res.json({ success: true, path: defaultRoot });
+    }
+
+    const absolutePath = path.resolve(newPath);
+
+    // Validate the path exists and is a directory
+    try {
+      const stats = await fs.stat(absolutePath);
+      if (!stats.isDirectory()) {
+        return res.status(400).json({ error: 'Path is not a directory' });
+      }
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return res.status(400).json({ error: 'Directory does not exist' });
+      }
+      throw error;
+    }
+
+    // Check it's not a forbidden system path
+    const normalizedPath = path.normalize(absolutePath);
+    if (FORBIDDEN_PATHS.includes(normalizedPath) || normalizedPath === '/') {
+      return res.status(400).json({ error: 'Cannot use system-critical directories' });
+    }
+
+    await setWorkspaceRootInConfig(absolutePath);
+    res.json({ success: true, path: absolutePath });
+  } catch (error) {
+    console.error('Error setting workspace root:', error);
+    res.status(500).json({ error: 'Failed to set workspace root' });
+  }
+});
 
 /**
  * Create a new workspace

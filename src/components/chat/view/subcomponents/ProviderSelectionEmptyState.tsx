@@ -44,22 +44,23 @@ const PROVIDERS: ProviderDef[] = [
     ring: 'ring-primary/15',
     check: 'bg-primary text-primary-foreground',
   },
-  {
-    id: 'cursor',
-    name: 'Cursor',
-    infoKey: 'providerSelection.providerInfo.cursorEditor',
-    accent: 'border-violet-500 dark:border-violet-400',
-    ring: 'ring-violet-500/15',
-    check: 'bg-violet-500 text-white',
-  },
-  {
-    id: 'codex',
-    name: 'Codex',
-    infoKey: 'providerSelection.providerInfo.openai',
-    accent: 'border-emerald-600 dark:border-emerald-400',
-    ring: 'ring-emerald-600/15',
-    check: 'bg-emerald-600 dark:bg-emerald-500 text-white',
-  },
+  // Cursor and Codex temporarily hidden — will re-add when content is ready
+  // {
+  //   id: 'cursor',
+  //   name: 'Cursor',
+  //   infoKey: 'providerSelection.providerInfo.cursorEditor',
+  //   accent: 'border-violet-500 dark:border-violet-400',
+  //   ring: 'ring-violet-500/15',
+  //   check: 'bg-violet-500 text-white',
+  // },
+  // {
+  //   id: 'codex',
+  //   name: 'Codex',
+  //   infoKey: 'providerSelection.providerInfo.openai',
+  //   accent: 'border-emerald-600 dark:border-emerald-400',
+  //   ring: 'ring-emerald-600/15',
+  //   check: 'bg-emerald-600 dark:bg-emerald-500 text-white',
+  // },
 ];
 
 function getModelConfig(p: SessionProvider) {
@@ -125,13 +126,13 @@ export default function ProviderSelectionEmptyState({
             </p>
             <p className="text-[12px] text-muted-foreground/90 mt-2">
               {t('providerSelection.cliBackendHint', {
-                defaultValue: 'Choose a CLI backend (Claude Code / Cursor / Codex)',
+                defaultValue: 'Choose a CLI backend',
               })}
             </p>
           </div>
 
           {/* Provider cards — horizontal row, equal width */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-2.5 mb-6">
+          <div className={`grid ${PROVIDERS.length === 1 ? 'grid-cols-1 max-w-[200px] mx-auto' : `grid-cols-${PROVIDERS.length}`} gap-2 sm:gap-2.5 mb-6`}>
             {PROVIDERS.map((p) => {
               const active = provider === p.id;
               return (
@@ -189,11 +190,7 @@ export default function ProviderSelectionEmptyState({
             <p className="text-center text-xs text-muted-foreground/70">
               {provider === 'claude'
                 ? t('providerSelection.readyPrompt.claude', { model: claudeModel })
-                : provider === 'cursor'
-                  ? t('providerSelection.readyPrompt.cursor', { model: cursorModel })
-                  : provider === 'codex'
-                    ? t('providerSelection.readyPrompt.codex', { model: codexModel })
-                    : t('providerSelection.readyPrompt.default')}
+                : t('providerSelection.readyPrompt.default')}
             </p>
           </div>
           </div>

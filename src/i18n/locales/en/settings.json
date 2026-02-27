@@ -105,6 +105,14 @@
       "alphabetical": "Alphabetical",
       "recentActivity": "Recent Activity"
     },
+    "defaultProjectPath": {
+      "label": "Default Project Path",
+      "description": "Default directory for new projects",
+      "browse": "Browse",
+      "reset": "Reset",
+      "saved": "Saved",
+      "invalidPath": "Invalid directory path"
+    },
     "codeEditor": {
       "title": "Code Editor",
       "theme": {

@@ -60,6 +60,9 @@
     "usedTools": "{{count}}개 도구 사용",
     "steps": "에이전트 단계"
   },
+  "skill": {
+    "contentLoaded": "스킬 콘텐츠 로드됨"
+  },
   "json": {
     "response": "JSON 응답"
   },

@@ -98,7 +98,48 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
       ref={messageRef}
       className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} flex flex-col w-full max-w-2xl mx-auto px-4 sm:px-6`}
     >
-      {message.type === 'user' ? (
+      {message.isSkillContent ? (
+        /* Collapsible skill content */
+        <div className="w-full mb-4">
+          <div className="border border-purple-200/50 dark:border-purple-800/30 rounded-lg bg-purple-50/30 dark:bg-purple-900/10 shadow-sm overflow-hidden">
+            <details className="group">
+              <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer text-[13px] select-none hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-colors">
+                <svg
+                  className="w-3.5 h-3.5 text-purple-400 dark:text-purple-500 transition-transform duration-150 group-open:rotate-90 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="font-bold text-purple-600 dark:text-purple-400 text-xs flex-shrink-0">Skill</span>
+                <span className="text-gray-300 dark:text-gray-700 text-[10px] flex-shrink-0 mx-0.5">|</span>
+                <span className="text-gray-500 dark:text-gray-400 truncate flex-1 font-medium text-xs">
+                  {(() => {
+                    const c = message.content || '';
+                    const cmdMatch = c.match(/<command-name>([^<]+)<\/command-name>/);
+                    if (cmdMatch) return cmdMatch[1];
+                    const pathMatch = c.match(/Base directory for this skill:\s*(\S+)/);
+                    if (pathMatch) return pathMatch[1].split('/').pop() || t('skill.contentLoaded');
+                    return t('skill.contentLoaded');
+                  })()}
+                </span>
+              </summary>
+              <div className="px-4 py-3 border-t border-purple-100 dark:border-purple-800/30 max-h-96 overflow-y-auto">
+                <Markdown className="prose prose-sm max-w-none dark:prose-invert">
+                  {(message.content || '')
+                    .replace(/<command-name>[^<]*<\/command-name>/g, '')
+                    .replace(/<\/?command-message>/g, '')
+                    .replace(/<command-args>[^<]*<\/command-args>/g, '')
+                    .replace(/<\/?local-command-stdout>/g, '')
+                    .replace(/^[❯>]\s*Base directory for this skill:\s*\S+\s*/m, '')
+                    .trim()}
+                </Markdown>
+              </div>
+            </details>
+          </div>
+        </div>
+      ) : message.type === 'user' ? (
         /* User message bubble */
         <div className="flex flex-col items-end w-full mb-4">
           <div className="flex items-center space-x-2 mb-1.5">

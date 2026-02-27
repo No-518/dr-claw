@@ -34,6 +34,7 @@ export interface ChatMessage {
   isThinking?: boolean;
   isStreaming?: boolean;
   isInteractivePrompt?: boolean;
+  isSkillContent?: boolean;
   isToolUse?: boolean;
   toolName?: string;
   toolInput?: unknown;

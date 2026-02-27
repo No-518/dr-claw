@@ -105,6 +105,14 @@
       "alphabetical": "알파벳순",
       "recentActivity": "최근 활동순"
     },
+    "defaultProjectPath": {
+      "label": "기본 프로젝트 경로",
+      "description": "새 프로젝트의 기본 저장 디렉토리",
+      "browse": "찾아보기",
+      "reset": "초기화",
+      "saved": "저장됨",
+      "invalidPath": "잘못된 디렉토리 경로"
+    },
     "codeEditor": {
       "title": "코드 에디터",
       "theme": {

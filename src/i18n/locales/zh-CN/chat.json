@@ -60,6 +60,9 @@
     "usedTools": "使用了 {{count}} 个工具",
     "steps": "执行步骤"
   },
+  "skill": {
+    "contentLoaded": "技能内容已加载"
+  },
   "json": {
     "response": "JSON 响应"
   },

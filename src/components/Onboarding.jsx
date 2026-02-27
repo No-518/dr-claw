@@ -351,7 +351,7 @@ const Onboarding = ({ onComplete }) => {
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-foreground mb-2">Connect Your AI Agents</h2>
               <p className="text-muted-foreground">
-                Login to one or more AI coding assistants. All are optional.
+                Login to your AI coding assistant. This is optional.
               </p>
             </div>
 
@@ -390,71 +390,7 @@ const Onboarding = ({ onComplete }) => {
                 </div>
               </div>
 
-              {/* Cursor */}
-              <div className={`border rounded-lg p-4 transition-colors ${
-                cursorAuthStatus.authenticated
-                  ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
-                  : 'border-border bg-card'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
-                      <CursorLogo size={20} />
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground flex items-center gap-2">
-                        Cursor
-                        {cursorAuthStatus.authenticated && <Check className="w-4 h-4 text-green-500" />}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {cursorAuthStatus.loading ? 'Checking...' :
-                         cursorAuthStatus.authenticated ? cursorAuthStatus.email || 'Connected' : 'Not connected'}
-                      </div>
-                    </div>
-                  </div>
-                  {!cursorAuthStatus.authenticated && !cursorAuthStatus.loading && (
-                    <button
-                      onClick={handleCursorLogin}
-                      className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                      Login
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Codex */}
-              <div className={`border rounded-lg p-4 transition-colors ${
-                codexAuthStatus.authenticated
-                  ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-600'
-                  : 'border-border bg-card'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                      <CodexLogo className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground flex items-center gap-2">
-                        OpenAI Codex
-                        {codexAuthStatus.authenticated && <Check className="w-4 h-4 text-green-500" />}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {codexAuthStatus.loading ? 'Checking...' :
-                         codexAuthStatus.authenticated ? codexAuthStatus.email || 'Connected' : 'Not connected'}
-                      </div>
-                    </div>
-                  </div>
-                  {!codexAuthStatus.authenticated && !codexAuthStatus.loading && (
-                    <button
-                      onClick={handleCodexLogin}
-                      className="bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                      Login
-                    </button>
-                  )}
-                </div>
-              </div>
+              {/* Cursor and Codex temporarily hidden — will re-add when content is ready */}
             </div>
 
             <div className="text-center text-sm text-muted-foreground pt-2">

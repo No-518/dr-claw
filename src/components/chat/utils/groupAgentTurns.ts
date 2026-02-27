@@ -100,7 +100,7 @@ export function groupMessagesIntoTurns(
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
-    if (msg.type === 'user') {
+    if (msg.type === 'user' && !msg.isSkillContent) {
       flushTurn(false);
       items.push({ kind: 'user', message: msg });
     } else {
