@@ -38,7 +38,7 @@ export default function ChatInputControls({
   const { t } = useTranslation('chat');
 
   return (
-    <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
+    <>
       <button
         type="button"
         onClick={onModeSwitch}
@@ -132,6 +132,6 @@ export default function ChatInputControls({
           </svg>
         </button>
       )}
-    </div>
+    </>
   );
 }

@@ -171,25 +171,21 @@ export default function ChatComposer({
 
   return (
     <div className={`p-2 sm:p-4 md:p-4 flex-shrink-0 pb-2 sm:pb-4 md:pb-6 ${mobileFloatingClass}`}>
-      {!hasQuestionPanel && (
-        <div className="flex-1">
-          <ClaudeStatus
-            status={claudeStatus}
-            isLoading={isLoading}
-            onAbort={onAbortSession}
-            provider={provider}
-          />
-        </div>
-      )}
-
-      <div className="max-w-4xl mx-auto mb-3">
+      <div className="max-w-5xl mx-auto mb-3">
         <PermissionRequestsBanner
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}
         />
 
-        {!hasQuestionPanel && <ChatInputControls
+        {!hasQuestionPanel && <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
+          <ClaudeStatus
+            status={claudeStatus}
+            isLoading={isLoading}
+            onAbort={onAbortSession}
+            provider={provider}
+          />
+          <ChatInputControls
           permissionMode={permissionMode}
           onModeSwitch={onModeSwitch}
           provider={provider}
@@ -203,10 +199,11 @@ export default function ChatComposer({
           isUserScrolledUp={isUserScrolledUp}
           hasMessages={hasMessages}
           onScrollToBottom={onScrollToBottom}
-        />}
+        />
+        </div>}
       </div>
 
-      {!hasQuestionPanel && <form onSubmit={onSubmit as (event: FormEvent<HTMLFormElement>) => void} className="relative max-w-4xl mx-auto">
+      {!hasQuestionPanel && <form onSubmit={onSubmit as (event: FormEvent<HTMLFormElement>) => void} className="relative max-w-5xl mx-auto">
         {isDragActive && (
           <div className="absolute inset-0 bg-primary/15 border-2 border-dashed border-primary/50 rounded-2xl flex items-center justify-center z-50">
             <div className="bg-card rounded-xl p-4 shadow-lg border border-border/30">

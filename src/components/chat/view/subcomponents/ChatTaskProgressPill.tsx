@@ -57,7 +57,7 @@ export default function ChatTaskProgressPill({
 
   return (
     <div
-      className={`w-full max-w-[30rem] rounded-xl border border-border/70 bg-card/95 shadow-sm backdrop-blur ${className}`}
+      className={`w-full rounded-xl border border-border/70 bg-card/95 shadow-sm backdrop-blur mt-2 mb-2 ${className}`}
     >
       <div className="flex items-center gap-2 px-3 py-2.5">
         <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300">

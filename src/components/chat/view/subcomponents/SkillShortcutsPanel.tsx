@@ -45,7 +45,7 @@ export default function SkillShortcutsPanel({
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto mt-4 mb-2">
+    <div className="w-full mt-2 mb-2">
       <div className="rounded-xl border border-border/50 bg-card/60">
         <button
           onClick={() => setIsCollapsed((c) => !c)}
@@ -58,7 +58,7 @@ export default function SkillShortcutsPanel({
         </button>
 
         {!isCollapsed && <div className="px-4 pb-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-2">
           {CATEGORIES.map((cat) => {
             const isExpanded = expandedCategory === cat.key;
             return (
@@ -66,23 +66,23 @@ export default function SkillShortcutsPanel({
                 key={cat.key}
                 onClick={() => setExpandedCategory(isExpanded ? null : cat.key)}
                 className={`
-                  flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-left transition-all duration-150
+                  flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-left transition-all duration-150
                   ${isExpanded
                     ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/10'
                     : 'border-border/50 bg-card/60 hover:bg-card hover:border-border/80'
                   }
                 `}
               >
-                <span className="text-lg leading-none flex-shrink-0">{cat.icon}</span>
+                <span className="text-sm leading-none flex-shrink-0">{cat.icon}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground leading-snug">
+                  <p className="text-xs font-medium text-foreground leading-snug">
                     {t(`skillShortcuts.categories.${cat.key}`)}
                   </p>
-                  <p className="text-xs text-muted-foreground leading-snug mt-0.5">
+                  <p className="text-[10px] text-muted-foreground leading-snug mt-0.5">
                     {cat.skills.length} skills
                   </p>
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground flex-shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3 h-3 text-muted-foreground flex-shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`} />
               </button>
             );
           })}

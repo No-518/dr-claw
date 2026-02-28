@@ -96,7 +96,7 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
   return (
     <div
       ref={messageRef}
-      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} flex flex-col w-full max-w-2xl mx-auto px-4 sm:px-6`}
+      className={`chat-message ${message.type} ${isGrouped ? 'grouped' : ''} flex flex-col w-full px-4 sm:px-6`}
     >
       {message.isSkillContent ? (
         /* Collapsible skill content */

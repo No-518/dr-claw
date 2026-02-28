@@ -9,7 +9,7 @@ type AssistantThinkingIndicatorProps = {
 
 export default function AssistantThinkingIndicator({ selectedProvider }: AssistantThinkingIndicatorProps) {
   return (
-    <div className="chat-message assistant flex flex-col w-full max-w-2xl mx-auto px-4 sm:px-6">
+    <div className="chat-message assistant flex flex-col w-full px-4 sm:px-6">
       <div className="flex flex-col w-full mb-6">
         <div className="flex items-center space-x-2 mb-2">
           <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">

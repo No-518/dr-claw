@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { decodeHtmlEntities, formatUsageLimitText } from '../utils/chatFormatting';
+import { parseAskUserAnswers, mergeAnswersIntoToolInput } from '../utils/messageTransforms';
 import { safeLocalStorage } from '../utils/chatStorage';
 import type { ChatMessage, PendingPermissionRequest } from '../types/types';
 import type { Project, ProjectSession, SessionProvider } from '../../../types/app';
@@ -503,7 +504,7 @@ export function useChatRealtimeHandlers({
 
                   // Handle normal tool results (including parent Task tool completion)
                   if (message.isToolUse && message.toolId === part.tool_use_id) {
-                    const result = {
+                    const result: any = {
                       ...message,
                       toolResult: {
                         content: part.content,
@@ -511,6 +512,14 @@ export function useChatRealtimeHandlers({
                         timestamp: new Date(),
                       },
                     };
+                    // Merge answers into AskUserQuestion toolInput from result content
+                    if (message.toolName === 'AskUserQuestion' && part.content) {
+                      const resultStr = typeof part.content === 'string' ? part.content : JSON.stringify(part.content);
+                      const parsedAnswers = parseAskUserAnswers(resultStr);
+                      if (parsedAnswers) {
+                        result.toolInput = mergeAnswersIntoToolInput(String(message.toolInput || '{}'), parsedAnswers);
+                      }
+                    }
                     // Mark subagent as complete when parent Task receives its result
                     if (message.isSubagentContainer && message.subagentState) {
                       result.subagentState = {

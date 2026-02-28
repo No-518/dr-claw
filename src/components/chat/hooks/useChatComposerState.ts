@@ -959,6 +959,21 @@ export function useChatComposerState({
         });
       });
 
+      // Update the local chatMessage toolInput so answered questions render with selections
+      if (decision?.updatedInput && typeof decision.updatedInput === 'object' && 'answers' in (decision.updatedInput as Record<string, unknown>)) {
+        const updated = decision.updatedInput as Record<string, unknown>;
+        setChatMessages((previous) => {
+          const msgs = [...previous];
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].toolName === 'AskUserQuestion' && msgs[i].isToolUse) {
+              msgs[i] = { ...msgs[i], toolInput: updated };
+              break;
+            }
+          }
+          return msgs;
+        });
+      }
+
       setPendingPermissionRequests((previous) => {
         const next = previous.filter((request) => !validIds.includes(request.requestId));
         if (next.length === 0) {
@@ -967,7 +982,7 @@ export function useChatComposerState({
         return next;
       });
     },
-    [sendMessage, setClaudeStatus, setPendingPermissionRequests],
+    [sendMessage, setChatMessages, setClaudeStatus, setPendingPermissionRequests],
   );
 
   const [isInputFocused, setIsInputFocused] = useState(false);

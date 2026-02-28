@@ -18,6 +18,36 @@ type CursorBlob = {
 
 const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 
+/**
+ * Parse answers from AskUserQuestion tool_result content.
+ * Format: 'User has answered your questions: "q1"="a1", "q2"="a2". You can now...'
+ */
+export const parseAskUserAnswers = (resultContent: string): Record<string, string> | null => {
+  if (!resultContent || !resultContent.includes('User has answered your questions:')) {
+    return null;
+  }
+  const answers: Record<string, string> = {};
+  // Match "question"="answer" pairs
+  const regex = /"([^"]+)"="([^"]+)"/g;
+  let match;
+  while ((match = regex.exec(resultContent)) !== null) {
+    answers[match[1]] = match[2];
+  }
+  return Object.keys(answers).length > 0 ? answers : null;
+};
+
+/**
+ * Merge parsed answers into a toolInput string (JSON) for AskUserQuestion.
+ */
+export const mergeAnswersIntoToolInput = (toolInput: string, answers: Record<string, string>): string => {
+  try {
+    const parsed = typeof toolInput === 'string' ? JSON.parse(toolInput) : toolInput;
+    return JSON.stringify({ ...parsed, answers }, null, 2);
+  } catch {
+    return toolInput;
+  }
+};
+
 const normalizeToolInput = (value: unknown): string => {
   if (value === null || value === undefined || value === '') {
     return '';
@@ -480,6 +510,16 @@ export const convertSessionMessages = (rawMessages: any[]): ChatMessage[] => {
             content: message.output || '',
             isError: false,
           };
+          // Merge answers into AskUserQuestion toolInput from result content
+          if (convertedMessage.toolName === 'AskUserQuestion' && message.output) {
+            const parsedAnswers = parseAskUserAnswers(String(message.output));
+            if (parsedAnswers) {
+              convertedMessage.toolInput = mergeAnswersIntoToolInput(
+                convertedMessage.toolInput as string,
+                parsedAnswers,
+              );
+            }
+          }
           break;
         }
       }
@@ -520,13 +560,25 @@ export const convertSessionMessages = (rawMessages: any[]): ChatMessage[] => {
               }
             }
 
+            // For AskUserQuestion, extract answers from tool_result and merge into toolInput
+            let finalToolInput = normalizeToolInput(part.input);
+            if (part.name === 'AskUserQuestion' && toolResult) {
+              const resultStr = typeof toolResult.content === 'string'
+                ? toolResult.content
+                : JSON.stringify(toolResult.content);
+              const parsedAnswers = parseAskUserAnswers(resultStr);
+              if (parsedAnswers) {
+                finalToolInput = mergeAnswersIntoToolInput(finalToolInput, parsedAnswers);
+              }
+            }
+
             converted.push({
               type: 'assistant',
               content: '',
               timestamp: message.timestamp || new Date().toISOString(),
               isToolUse: true,
               toolName: part.name,
-              toolInput: normalizeToolInput(part.input),
+              toolInput: finalToolInput,
               toolId: part.id,
               toolResult: toolResult
                 ? {

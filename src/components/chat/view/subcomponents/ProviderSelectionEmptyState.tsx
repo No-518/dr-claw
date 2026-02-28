@@ -2,9 +2,6 @@ import React from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import SessionProviderLogo from '../../../SessionProviderLogo';
-import NextTaskBanner from '../../../NextTaskBanner.jsx';
-import PipelineOnboardingBanner from './PipelineOnboardingBanner';
-import SkillShortcutsPanel from './SkillShortcutsPanel';
 import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../../../../shared/modelConstants';
 import type { ProjectSession, SessionProvider } from '../../../../types/app';
 
@@ -20,10 +17,6 @@ interface ProviderSelectionEmptyStateProps {
   setCursorModel: (model: string) => void;
   codexModel: string;
   setCodexModel: (model: string) => void;
-  tasksEnabled: boolean;
-  isTaskMasterInstalled: boolean | null;
-  onShowAllTasks?: (() => void) | null;
-  setInput: React.Dispatch<React.SetStateAction<string>>;
 }
 
 type ProviderDef = {
@@ -87,13 +80,8 @@ export default function ProviderSelectionEmptyState({
   setCursorModel,
   codexModel,
   setCodexModel,
-  tasksEnabled,
-  isTaskMasterInstalled,
-  onShowAllTasks,
-  setInput,
 }: ProviderSelectionEmptyStateProps) {
   const { t } = useTranslation('chat');
-  const nextTaskPrompt = t('tasks.nextTaskPrompt', { defaultValue: 'Start the next task' });
 
   const selectProvider = (next: SessionProvider) => {
     setProvider(next);
@@ -195,19 +183,6 @@ export default function ProviderSelectionEmptyState({
           </div>
           </div>
 
-          {/* Pipeline onboarding or task banner */}
-          {provider && (
-            <div className="mt-5">
-              <PipelineOnboardingBanner setInput={setInput} textareaRef={textareaRef} />
-              <SkillShortcutsPanel setInput={setInput} textareaRef={textareaRef} />
-              {tasksEnabled && isTaskMasterInstalled && (
-                <NextTaskBanner
-                  onStartTask={(prompt?: string) => setInput(prompt && prompt.trim() ? prompt : nextTaskPrompt)}
-                  onShowAllTasks={onShowAllTasks}
-                />
-              )}
-            </div>
-          )}
         </div>
       </div>
     );
@@ -221,17 +196,6 @@ export default function ProviderSelectionEmptyState({
           <div className="max-w-md mx-auto">
             <p className="text-lg font-semibold text-foreground mb-1.5">{t('session.continue.title')}</p>
             <p className="text-sm text-muted-foreground leading-relaxed">{t('session.continue.description')}</p>
-          </div>
-
-          <div className="mt-5">
-            <PipelineOnboardingBanner setInput={setInput} textareaRef={textareaRef} />
-            <SkillShortcutsPanel setInput={setInput} textareaRef={textareaRef} />
-            {tasksEnabled && isTaskMasterInstalled && (
-              <NextTaskBanner
-                onStartTask={(prompt?: string) => setInput(prompt && prompt.trim() ? prompt : nextTaskPrompt)}
-                onShowAllTasks={onShowAllTasks}
-              />
-            )}
           </div>
         </div>
       </div>

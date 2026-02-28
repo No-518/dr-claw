@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useCallback, useMemo, useRef } from 'react';
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import type { RefObject } from 'react';
 
 import MessageComponent from './MessageComponent';
 import AgentTurnContainer from './AgentTurnContainer';
@@ -28,10 +28,6 @@ interface ChatMessagesPaneProps {
   setCursorModel: (model: string) => void;
   codexModel: string;
   setCodexModel: (model: string) => void;
-  tasksEnabled: boolean;
-  isTaskMasterInstalled: boolean | null;
-  onShowAllTasks?: (() => void) | null;
-  setInput: Dispatch<SetStateAction<string>>;
   isLoadingMoreMessages: boolean;
   hasMoreMessages: boolean;
   totalMessages: number;
@@ -72,10 +68,6 @@ export default function ChatMessagesPane({
   setCursorModel,
   codexModel,
   setCodexModel,
-  tasksEnabled,
-  isTaskMasterInstalled,
-  onShowAllTasks,
-  setInput,
   isLoadingMoreMessages,
   hasMoreMessages,
   totalMessages,
@@ -137,8 +129,9 @@ export default function ChatMessagesPane({
       ref={scrollContainerRef}
       onWheel={onWheel}
       onTouchMove={onTouchMove}
-      className="flex-1 overflow-y-auto overflow-x-hidden px-0 py-3 sm:p-4 space-y-3 sm:space-y-4 relative"
+      className="flex-1 overflow-y-auto overflow-x-hidden px-0 py-3 sm:p-4 relative"
     >
+      <div className="max-w-5xl mx-auto space-y-3 sm:space-y-4">
       {isLoadingSessionMessages && chatMessages.length === 0 ? (
         <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
           <div className="flex items-center justify-center space-x-2">
@@ -159,10 +152,6 @@ export default function ChatMessagesPane({
           setCursorModel={setCursorModel}
           codexModel={codexModel}
           setCodexModel={setCodexModel}
-          tasksEnabled={tasksEnabled}
-          isTaskMasterInstalled={isTaskMasterInstalled}
-          onShowAllTasks={onShowAllTasks}
-          setInput={setInput}
         />
       ) : (
         <>
@@ -284,6 +273,7 @@ export default function ChatMessagesPane({
       )}
 
       {isLoading && <AssistantThinkingIndicator selectedProvider={provider} />}
+      </div>
     </div>
   );
 }
