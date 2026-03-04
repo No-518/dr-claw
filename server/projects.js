@@ -320,8 +320,9 @@ async function extractProjectDirectory(projectName) {
     const jsonlFiles = files.filter(file => file.endsWith('.jsonl'));
 
     if (jsonlFiles.length === 0) {
-      // Fall back to decoded project name if no sessions
-      extractedPath = projectName.replace(/-/g, '/');
+      // Fall back to decoded project name if no sessions, but never to '/'
+      const decoded = projectName.replace(/-/g, '/');
+      extractedPath = decoded === '/' ? os.homedir() : decoded;
     } else {
       // Process all JSONL files to collect cwd values
       for (const file of jsonlFiles) {
@@ -357,8 +358,9 @@ async function extractProjectDirectory(projectName) {
 
       // Determine the best cwd to use
       if (cwdCounts.size === 0) {
-        // No cwd found, fall back to decoded project name
-        extractedPath = projectName.replace(/-/g, '/');
+        // No cwd found, fall back to decoded project name, but never to '/'
+        const decoded = projectName.replace(/-/g, '/');
+        extractedPath = decoded === '/' ? os.homedir() : decoded;
       } else if (cwdCounts.size === 1) {
         // Only one cwd, use it
         extractedPath = Array.from(cwdCounts.keys())[0];
@@ -382,7 +384,8 @@ async function extractProjectDirectory(projectName) {
 
         // Fallback (shouldn't reach here)
         if (!extractedPath) {
-          extractedPath = latestCwd || projectName.replace(/-/g, '/');
+          const decoded = projectName.replace(/-/g, '/');
+          extractedPath = latestCwd || (decoded === '/' ? os.homedir() : decoded);
         }
       }
     }
@@ -395,11 +398,13 @@ async function extractProjectDirectory(projectName) {
   } catch (error) {
     // If the directory doesn't exist, just use the decoded project name
     if (error.code === 'ENOENT') {
-      extractedPath = projectName.replace(/-/g, '/');
+      const decoded = projectName.replace(/-/g, '/');
+      extractedPath = decoded === '/' ? os.homedir() : decoded;
     } else {
       console.error(`Error extracting project directory for ${projectName}:`, error);
-      // Fall back to decoded project name for other errors
-      extractedPath = projectName.replace(/-/g, '/');
+      // Fall back to decoded project name for other errors, but never to '/'
+      const decoded = projectName.replace(/-/g, '/');
+      extractedPath = decoded === '/' ? os.homedir() : decoded;
     }
 
     // Cache the fallback result too
