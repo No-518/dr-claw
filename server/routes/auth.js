@@ -16,7 +16,7 @@ router.get('/status', async (req, res) => {
 // User registration (setup) - only allowed if no users exist
 router.post('/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, resetExisting = false } = req.body;
     
     // Validate input
     if (!username || !password) {
@@ -32,9 +32,13 @@ router.post('/register', async (req, res) => {
     try {
       // Check if users already exist (only allow one user)
       const hasUsers = userDb.hasUsers();
-      if (hasUsers) {
+      if (hasUsers && !resetExisting) {
         db.prepare('ROLLBACK').run();
         return res.status(403).json({ error: 'User already exists. This is a single-user system.' });
+      }
+
+      if (hasUsers && resetExisting) {
+        userDb.resetSingleUser();
       }
       
       // Hash password

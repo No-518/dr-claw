@@ -134,10 +134,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (username, password) => {
+  const register = async (username, password, resetExisting = false) => {
     try {
       setError(null);
-      const response = await api.auth.register(username, password);
+      const response = await api.auth.register(username, password, resetExisting);
 
       const data = await response.json();
 

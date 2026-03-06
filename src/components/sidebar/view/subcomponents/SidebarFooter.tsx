@@ -1,4 +1,4 @@
-import { Settings, ArrowUpCircle } from 'lucide-react';
+import { Settings, ArrowUpCircle, LogOut } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import type { ReleaseInfo } from '../../../../types/sharedTypes';
 
@@ -8,6 +8,7 @@ type SidebarFooterProps = {
   latestVersion: string | null;
   onShowVersionModal: () => void;
   onShowSettings: () => void;
+  onLogout: () => void;
   t: TFunction;
 };
 
@@ -17,6 +18,7 @@ export default function SidebarFooter({
   latestVersion,
   onShowVersionModal,
   onShowSettings,
+  onLogout,
   t,
 }: SidebarFooterProps) {
   return (
@@ -73,7 +75,7 @@ export default function SidebarFooter({
       <div className="nav-divider" />
 
       {/* Desktop settings */}
-      <div className="hidden md:block px-2 py-1.5">
+      <div className="hidden md:block px-2 py-1.5 space-y-1.5">
         <button
           className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
           onClick={onShowSettings}
@@ -81,10 +83,17 @@ export default function SidebarFooter({
           <Settings className="w-4 h-4" />
           <span className="text-[14px] font-medium">{t('actions.settings')}</span>
         </button>
+        <button
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+          onClick={onLogout}
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-[14px] font-medium">{t('actions.logout')}</span>
+        </button>
       </div>
 
       {/* Mobile settings */}
-      <div className="md:hidden p-3 pb-20">
+      <div className="md:hidden p-3 pb-20 space-y-2">
         <button
           className="w-full h-12 bg-muted/40 hover:bg-muted/60 rounded-xl flex items-center gap-3.5 px-4 active:scale-[0.98] transition-all"
           onClick={onShowSettings}
@@ -93,6 +102,15 @@ export default function SidebarFooter({
             <Settings className="w-4.5 h-4.5 text-muted-foreground" />
           </div>
           <span className="text-base font-medium text-foreground">{t('actions.settings')}</span>
+        </button>
+        <button
+          className="w-full h-12 bg-muted/40 hover:bg-muted/60 rounded-xl flex items-center gap-3.5 px-4 active:scale-[0.98] transition-all"
+          onClick={onLogout}
+        >
+          <div className="w-8 h-8 rounded-xl bg-background/80 flex items-center justify-center">
+            <LogOut className="w-4.5 h-4.5 text-muted-foreground" />
+          </div>
+          <span className="text-base font-medium text-foreground">{t('actions.logout')}</span>
         </button>
       </div>
     </div>

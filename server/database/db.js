@@ -144,6 +144,14 @@ const userDb = {
     }
   },
 
+  resetSingleUser: () => {
+    try {
+      db.prepare('DELETE FROM users').run();
+    } catch (err) {
+      throw err;
+    }
+  },
+
   // Update last login time (non-fatal)
   updateLastLogin: (userId) => {
     try {

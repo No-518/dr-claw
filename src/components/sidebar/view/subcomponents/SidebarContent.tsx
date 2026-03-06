@@ -25,6 +25,7 @@ type SidebarContentProps = {
   latestVersion: string | null;
   onShowVersionModal: () => void;
   onShowSettings: () => void;
+  onLogout: () => void;
   projectListProps: SidebarProjectListProps;
   t: TFunction;
 };
@@ -48,6 +49,7 @@ export default function SidebarContent({
   latestVersion,
   onShowVersionModal,
   onShowSettings,
+  onLogout,
   projectListProps,
   t,
 }: SidebarContentProps) {
@@ -83,6 +85,7 @@ export default function SidebarContent({
         latestVersion={latestVersion}
         onShowVersionModal={onShowVersionModal}
         onShowSettings={onShowSettings}
+        onLogout={onLogout}
         t={t}
       />
     </div>
