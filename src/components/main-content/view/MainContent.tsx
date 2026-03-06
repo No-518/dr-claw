@@ -2,16 +2,17 @@ import React, { useEffect } from 'react';
 
 import ChatInterface from '../../chat/view/ChatInterface';
 import FileTree from '../../FileTree';
-import StandaloneShell from '../../StandaloneShell';
 import GitPanel from '../../GitPanel';
 import ResearchLab from '../../ResearchLab';
 import SkillsDashboard from '../../SkillsDashboard';
 import ComputePanel from '../../ComputePanel';
 import ErrorBoundary from '../../ErrorBoundary';
+import SurveyPage from '../../survey/view/SurveyPage';
 
 import MainContentHeader from './subcomponents/MainContentHeader';
 import MainContentStateView from './subcomponents/MainContentStateView';
 import EditorSidebar from './subcomponents/EditorSidebar';
+import ShellWorkspace from './subcomponents/ShellWorkspace';
 import type { MainContentProps } from '../types/types';
 
 import { useTaskMaster } from '../../../contexts/TaskMasterContext';
@@ -19,7 +20,6 @@ import { useUiPreferences } from '../../../hooks/useUiPreferences';
 import { useEditorSidebar } from '../hooks/useEditorSidebar';
 import type { Project } from '../../../types/app';
 
-const AnyStandaloneShell = StandaloneShell as any;
 const AnyGitPanel = GitPanel as any;
 
 type TaskMasterContextValue = {
@@ -144,13 +144,19 @@ function MainContent({
 
           {activeTab === 'shell' && (
             <div className="h-full w-full overflow-hidden">
-              <AnyStandaloneShell project={selectedProject} session={selectedSession} isPlainShell={true} showHeader={false} />
+              <ShellWorkspace project={selectedProject} />
             </div>
           )}
 
           {activeTab === 'git' && (
             <div className="h-full overflow-hidden">
               <AnyGitPanel selectedProject={selectedProject} isMobile={isMobile} onFileOpen={handleFileOpen} />
+            </div>
+          )}
+
+          {activeTab === 'survey' && (
+            <div className="h-full overflow-hidden">
+              <SurveyPage selectedProject={selectedProject} />
             </div>
           )}
 

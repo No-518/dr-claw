@@ -1,36 +1,45 @@
 import React from 'react';
-import { MessageSquare, Folder, Terminal, GitBranch, FlaskConical } from 'lucide-react';
+import { MessageSquare, Folder, Terminal, GitBranch, FlaskConical, BookOpen } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 function MobileNav({ activeTab, setActiveTab, isInputFocused }) {
+  const { t } = useTranslation('common');
+
   const navItems = [
+    {
+      id: 'survey',
+      icon: BookOpen,
+      label: t('mobileNav.survey'),
+      onClick: () => setActiveTab('survey')
+    },
     {
       id: 'researchlab',
       icon: FlaskConical,
-      label: 'Lab',
+      label: t('mobileNav.researchLab'),
       onClick: () => setActiveTab('researchlab')
     },
     {
       id: 'chat',
       icon: MessageSquare,
-      label: 'Chat',
+      label: t('tabs.chat'),
       onClick: () => setActiveTab('chat')
     },
     {
       id: 'shell',
       icon: Terminal,
-      label: 'Shell',
+      label: t('tabs.shell'),
       onClick: () => setActiveTab('shell')
     },
     {
       id: 'files',
       icon: Folder,
-      label: 'Files',
+      label: t('tabs.files'),
       onClick: () => setActiveTab('files')
     },
     {
       id: 'git',
       icon: GitBranch,
-      label: 'Git',
+      label: t('mobileNav.git'),
       onClick: () => setActiveTab('git')
     }
   ];

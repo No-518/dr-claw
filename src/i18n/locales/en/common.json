@@ -19,6 +19,7 @@
   },
   "tabs": {
     "chat": "Chat",
+    "survey": "Survey",
     "shell": "Shell",
     "files": "Files",
     "git": "Source Control",
@@ -77,6 +78,64 @@
     "next": "Next",
     "previous": "Previous",
     "logout": "Logout"
+  },
+  "mobileNav": {
+    "survey": "Survey",
+    "researchLab": "Lab",
+    "git": "Git"
+  },
+  "surveyPage": {
+    "title": "Survey Stage",
+    "description": "Review project-related papers, literature graphs, survey notes, and stage tasks in one place.",
+    "filterPlaceholder": "Filter papers, graphs, and notes...",
+    "loading": "Loading survey materials...",
+    "summary": {
+      "papers": "Papers",
+      "reports": "Reports",
+      "graphs": "Graphs",
+      "tasks": "Survey Tasks"
+    },
+    "labels": {
+      "workspaceTag": "Survey Workspace",
+      "focusTag": "Literature Review",
+      "library": "Survey Library",
+      "preview": "Preview"
+    },
+    "actions": {
+      "collapse": "Collapse",
+      "expand": "Expand"
+    },
+    "sections": {
+      "papers": "Project Papers",
+      "reports": "Survey Reports",
+      "graphs": "Literature Graphs",
+      "notes": "Survey Notes",
+      "tasks": "Stage Tasks"
+    },
+    "errors": {
+      "loadFailed": "Failed to load survey data for this project."
+    },
+    "empty": {
+      "noSurveyFiles": "No survey-related files were found under Survey/ or Research/ yet.",
+      "noSectionFiles": "No {{section}} files match the current filter.",
+      "noTasks": "No survey-stage tasks are available yet.",
+      "noSelection": "Select a paper, graph, report, note, or task to inspect it here.",
+      "noTaskDescription": "This task does not have a description yet."
+    },
+    "preview": {
+      "loading": "Loading preview...",
+      "failed": "Failed to load the selected survey item.",
+      "unsupported": "This file type is not previewable yet in the Survey page.",
+      "surveyTask": "Survey Task",
+      "taskDescription": "Task Description",
+      "dragHint": "Drag to pan the diagram",
+      "zoomIn": "Zoom In",
+      "zoomOut": "Zoom Out",
+      "fit": "Fit",
+      "resetZoom": "Reset",
+      "openInWindow": "Open in Window",
+      "windowLoadFailed": "Failed to open the diagram in a separate window."
+    }
   },
   "common": {
     "language": "Language",
