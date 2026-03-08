@@ -41,6 +41,7 @@ export type SidebarProps = {
   isMobile: boolean;
   activeTab: AppTab;
   onOpenDashboard: () => void;
+  onOpenSkills: () => void;
 };
 
 export type SessionViewModel = {

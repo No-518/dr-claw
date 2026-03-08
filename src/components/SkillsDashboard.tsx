@@ -936,11 +936,7 @@ function facetButtonClass(active: boolean): string {
   }`;
 }
 
-interface SkillsDashboardProps {
-  selectedProject?: { name: string; displayName: string } | null;
-}
-
-export default function SkillsDashboard({ selectedProject: _selectedProject }: SkillsDashboardProps) {
+export default function SkillsDashboard() {
   const { i18n } = useTranslation();
   const localeKey = useMemo(() => resolveLocaleKey(i18n.language || 'en'), [i18n.language]);
   const text = UI_TEXT[localeKey];

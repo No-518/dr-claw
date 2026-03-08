@@ -4,6 +4,7 @@ import {
   FolderOpen,
   FlaskConical,
   MessageSquare,
+  Sparkles,
   Terminal,
 } from 'lucide-react';
 import { useMemo } from 'react';
@@ -26,11 +27,43 @@ type TaskmasterMetadata = {
   lastModified?: string;
 };
 
+const PROJECT_TONES = [
+  {
+    shell: 'from-sky-100/95 via-cyan-50/90 to-white dark:from-sky-950/35 dark:via-cyan-950/20 dark:to-slate-950/80',
+    orb: 'bg-sky-300/35 dark:bg-sky-500/20',
+    border: 'hover:border-sky-300/60 dark:hover:border-sky-700/60',
+    progress: 'from-sky-500 via-cyan-500 to-emerald-500',
+    badge: 'border-sky-200/80 bg-sky-50 text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/40 dark:text-sky-200',
+  },
+  {
+    shell: 'from-emerald-100/95 via-teal-50/90 to-white dark:from-emerald-950/35 dark:via-teal-950/20 dark:to-slate-950/80',
+    orb: 'bg-emerald-300/35 dark:bg-emerald-500/20',
+    border: 'hover:border-emerald-300/60 dark:hover:border-emerald-700/60',
+    progress: 'from-emerald-500 via-teal-500 to-cyan-500',
+    badge: 'border-emerald-200/80 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200',
+  },
+  {
+    shell: 'from-amber-100/95 via-orange-50/90 to-white dark:from-amber-950/35 dark:via-orange-950/20 dark:to-slate-950/80',
+    orb: 'bg-amber-300/35 dark:bg-amber-500/20',
+    border: 'hover:border-amber-300/60 dark:hover:border-amber-700/60',
+    progress: 'from-amber-500 via-orange-500 to-rose-500',
+    badge: 'border-amber-200/80 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200',
+  },
+  {
+    shell: 'from-indigo-100/95 via-violet-50/90 to-white dark:from-indigo-950/35 dark:via-violet-950/20 dark:to-slate-950/80',
+    orb: 'bg-indigo-300/35 dark:bg-indigo-500/20',
+    border: 'hover:border-indigo-300/60 dark:hover:border-indigo-700/60',
+    progress: 'from-indigo-500 via-violet-500 to-fuchsia-500',
+    badge: 'border-indigo-200/80 bg-indigo-50 text-indigo-700 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-200',
+  },
+] as const;
+
 function getProjectSessions(project: Project): ProjectSession[] {
   return [
     ...(project.sessions ?? []),
     ...(project.cursorSessions ?? []),
     ...(project.codexSessions ?? []),
+    ...(project.geminiSessions ?? []),
   ];
 }
 
@@ -69,6 +102,39 @@ function getProgress(project: Project) {
   return null;
 }
 
+function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string | number;
+  detail?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/45">
+      <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">{label}</div>
+      <div className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</div>
+      {detail ? <div className="mt-2 text-xs text-muted-foreground">{detail}</div> : null}
+    </div>
+  );
+}
+
+function MetricPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-2xl border border-border/50 bg-background/70 p-3 shadow-sm">
+      <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+      <div className="mt-1.5 text-xl font-semibold text-foreground">{value}</div>
+    </div>
+  );
+}
+
 export default function ProjectDashboard({
   projects,
   onProjectAction,
@@ -87,26 +153,36 @@ export default function ProjectDashboard({
       : null;
     const totalSessions = projects.reduce((sum, project) => sum + getProjectSessions(project).length, 0);
 
+    const mostRecentlyActiveProject = [...projects]
+      .map((project) => ({
+        project,
+        lastActivity: getLastActivity(project),
+      }))
+      .filter((entry): entry is { project: Project; lastActivity: string } => Boolean(entry.lastActivity))
+      .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())[0] ?? null;
+
     return {
       projectCount,
       trackedProjects,
       averageProgress,
       totalSessions,
+      mostRecentlyActiveProject,
     };
   }, [projects]);
 
   if (projects.length === 0) {
     return (
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_22%),linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.94))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_22%),linear-gradient(180deg,rgba(8,15,28,0.98),rgba(15,23,42,0.98))]">
         <div className="mx-auto flex h-full w-full max-w-6xl items-center px-4 py-8 sm:px-6 lg:px-8">
-          <div className="w-full rounded-3xl border border-dashed border-border/70 bg-card/40 p-8 text-center sm:p-12">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <FolderOpen className="h-6 w-6" />
+          <div className="relative w-full overflow-hidden rounded-[32px] border border-border/60 bg-card/70 p-8 text-center shadow-sm backdrop-blur sm:p-12">
+            <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-r from-sky-500/10 via-cyan-400/10 to-emerald-400/10" />
+            <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <FolderOpen className="h-7 w-7" />
             </div>
-            <h2 className="mt-5 text-2xl font-semibold text-foreground">
+            <h2 className="relative mt-5 text-3xl font-semibold tracking-tight text-foreground">
               {t('projectDashboard.emptyTitle')}
             </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
+            <p className="relative mx-auto mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
               {t('projectDashboard.emptyDescription')}
             </p>
           </div>
@@ -116,54 +192,121 @@ export default function ProjectDashboard({
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_22%),linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.94))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_22%),linear-gradient(180deg,rgba(8,15,28,0.98),rgba(15,23,42,0.98))]">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <section className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border border-border/60 bg-card/80 p-5 shadow-sm">
-            <div className="text-sm text-muted-foreground">{t('projectDashboard.summary.projects')}</div>
-            <div className="mt-2 text-3xl font-semibold text-foreground">{totals.projectCount}</div>
-          </div>
-          <div className="rounded-3xl border border-border/60 bg-card/80 p-5 shadow-sm">
-            <div className="text-sm text-muted-foreground">{t('projectDashboard.summary.sessions')}</div>
-            <div className="mt-2 text-3xl font-semibold text-foreground">{totals.totalSessions}</div>
-          </div>
-          <div className="rounded-3xl border border-border/60 bg-card/80 p-5 shadow-sm">
-            <div className="text-sm text-muted-foreground">{t('projectDashboard.summary.progress')}</div>
-            <div className="mt-2 text-3xl font-semibold text-foreground">
-              {totals.averageProgress === null ? t('projectDashboard.notTrackedShort') : `${totals.averageProgress}%`}
+        <section className="relative overflow-hidden rounded-[32px] border border-border/60 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.24),transparent_34%),linear-gradient(135deg,rgba(248,250,252,0.96),rgba(240,249,255,0.90))] p-6 shadow-sm dark:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_34%),linear-gradient(135deg,rgba(2,6,23,0.96),rgba(15,23,42,0.92))] sm:p-7">
+          <div className="absolute -right-12 -top-10 h-36 w-36 rounded-full bg-sky-200/50 blur-3xl dark:bg-sky-500/15" />
+          <div className="absolute bottom-0 right-20 h-24 w-24 rounded-full bg-emerald-200/40 blur-2xl dark:bg-emerald-500/10" />
+
+          <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.85fr)]">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-sky-200/70 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-sky-700 shadow-sm dark:border-sky-800/60 dark:bg-slate-950/60 dark:text-sky-200">
+                <Sparkles className="h-3.5 w-3.5" />
+                {t('projectDashboard.overviewBadge')}
+              </div>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                {t('projectDashboard.title')}
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
+                {t('projectDashboard.subtitle')}
+              </p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <StatCard
+                  label={t('projectDashboard.summary.projects')}
+                  value={totals.projectCount}
+                />
+                <StatCard
+                  label={t('projectDashboard.summary.sessions')}
+                  value={totals.totalSessions}
+                />
+                <StatCard
+                  label={t('projectDashboard.summary.tracked')}
+                  value={totals.trackedProjects}
+                  detail={t('projectDashboard.summary.trackedProjects', { count: totals.trackedProjects })}
+                />
+                <StatCard
+                  label={t('projectDashboard.summary.progress')}
+                  value={totals.averageProgress === null ? t('projectDashboard.notTrackedShort') : `${totals.averageProgress}%`}
+                />
+              </div>
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {t('projectDashboard.summary.trackedProjects', { count: totals.trackedProjects })}
+
+            <div className="grid gap-4">
+              <div className="rounded-[28px] border border-border/60 bg-card/78 p-5 shadow-sm backdrop-blur">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Activity className="h-4 w-4 text-primary" />
+                  {t('projectDashboard.activityTitle')}
+                </div>
+                {totals.mostRecentlyActiveProject ? (
+                  <div className="mt-4 rounded-2xl border border-border/50 bg-background/70 p-4 shadow-sm">
+                    <div className="text-lg font-semibold text-foreground">
+                      {totals.mostRecentlyActiveProject.project.displayName}
+                    </div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {t('projectDashboard.lastActivity', {
+                        time: formatTimeAgo(totals.mostRecentlyActiveProject.lastActivity, now, t),
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-2xl border border-dashed border-border/60 bg-background/50 px-4 py-5 text-sm text-muted-foreground">
+                    {t('projectDashboard.noRecentActivity')}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>
 
+        <section className="flex items-end justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight text-foreground">
+              {t('projectDashboard.projectsSectionTitle')}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t('projectDashboard.projectsSectionSubtitle')}
+            </p>
+          </div>
+          <div className="hidden rounded-full border border-border/60 bg-background/70 px-4 py-2 text-sm text-muted-foreground shadow-sm backdrop-blur sm:block">
+            {t('projectDashboard.summary.projects')}: {totals.projectCount}
+          </div>
+        </section>
+
         <section className="grid gap-4 xl:grid-cols-2">
-          {projects.map((project) => {
+          {projects.map((project, index) => {
             const sessions = getProjectSessions(project);
             const metadata = getTaskmasterMetadata(project);
             const progress = getProgress(project);
             const lastActivity = getLastActivity(project);
+            const tone = PROJECT_TONES[index % PROJECT_TONES.length];
 
             return (
               <article
                 key={project.name}
-                className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-sm transition-colors hover:border-primary/30"
+                className={`relative overflow-hidden rounded-[28px] border border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.90),rgba(248,250,252,0.82))] p-5 shadow-sm transition-all duration-200 ${tone.border} hover:-translate-y-0.5 hover:shadow-md dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.82))]`}
               >
-                <div className="flex flex-col gap-4">
+                <div className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-r ${tone.shell}`} />
+                <div className={`absolute right-5 top-5 h-16 w-16 rounded-full blur-2xl ${tone.orb}`} />
+
+                <div className="relative flex flex-col gap-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="truncate text-lg font-semibold text-foreground">
+                        <h2 className="truncate text-xl font-semibold tracking-tight text-foreground">
                           {project.displayName}
                         </h2>
-                        {progress !== null && (
-                          <Badge variant="secondary" className="rounded-full">
+                        {progress !== null ? (
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${tone.badge}`}>
                             {t('projectDashboard.progressBadge', { progress })}
-                          </Badge>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/75 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                            {t('projectDashboard.notTrackedShort')}
+                          </span>
                         )}
                       </div>
-                      <p className="mt-1 break-all text-xs text-muted-foreground sm:text-sm">
+                      <p className="mt-2 break-all text-xs text-muted-foreground sm:text-sm">
                         {project.fullPath}
                       </p>
                     </div>
@@ -171,7 +314,7 @@ export default function ProjectDashboard({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="self-start rounded-full"
+                      className="self-start rounded-full bg-white/70 backdrop-blur dark:bg-slate-950/45"
                       onClick={() => onProjectAction(project, 'chat')}
                     >
                       <FolderOpen className="h-4 w-4" />
@@ -180,21 +323,12 @@ export default function ProjectDashboard({
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl bg-muted/40 p-3">
-                      <div className="text-xs text-muted-foreground">{t('projectDashboard.metrics.sessions')}</div>
-                      <div className="mt-1 text-xl font-semibold text-foreground">{sessions.length}</div>
-                    </div>
-                    <div className="rounded-2xl bg-muted/40 p-3">
-                      <div className="text-xs text-muted-foreground">{t('projectDashboard.metrics.tasks')}</div>
-                      <div className="mt-1 text-xl font-semibold text-foreground">{metadata?.taskCount ?? '0'}</div>
-                    </div>
-                    <div className="rounded-2xl bg-muted/40 p-3">
-                      <div className="text-xs text-muted-foreground">{t('projectDashboard.metrics.completed')}</div>
-                      <div className="mt-1 text-xl font-semibold text-foreground">{metadata?.completed ?? '0'}</div>
-                    </div>
+                    <MetricPill label={t('projectDashboard.metrics.sessions')} value={sessions.length} />
+                    <MetricPill label={t('projectDashboard.metrics.tasks')} value={metadata?.taskCount ?? '0'} />
+                    <MetricPill label={t('projectDashboard.metrics.completed')} value={metadata?.completed ?? '0'} />
                   </div>
 
-                  <div className="rounded-2xl border border-border/50 bg-background/60 p-4">
+                  <div className="rounded-2xl border border-border/50 bg-background/70 p-4 shadow-sm">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <Activity className="h-4 w-4 text-primary" />
@@ -206,10 +340,10 @@ export default function ProjectDashboard({
                           : t('projectDashboard.progressValue', { progress })}
                       </div>
                     </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted/80">
                       <div
-                        className="h-full rounded-full bg-primary transition-[width] duration-300"
-                        style={{ width: `${progress ?? 0}%` }}
+                        className={`h-full rounded-full bg-gradient-to-r ${tone.progress} transition-[width] duration-300`}
+                        style={{ width: `${progress ?? 6}%` }}
                       />
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
@@ -220,13 +354,13 @@ export default function ProjectDashboard({
                             })
                           : t('projectDashboard.noRecentActivity')}
                       </span>
-                      {metadata?.lastModified && (
+                      {metadata?.lastModified ? (
                         <span>
                           {t('projectDashboard.pipelineUpdated', {
                             time: formatTimeAgo(metadata.lastModified, now, t),
                           })}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
@@ -243,7 +377,7 @@ export default function ProjectDashboard({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="rounded-full"
+                      className="rounded-full bg-white/60 backdrop-blur dark:bg-slate-950/35"
                       onClick={() => onProjectAction(project, 'files')}
                     >
                       <FolderOpen className="h-4 w-4" />
@@ -252,7 +386,7 @@ export default function ProjectDashboard({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="rounded-full"
+                      className="rounded-full bg-white/60 backdrop-blur dark:bg-slate-950/35"
                       onClick={() => onProjectAction(project, 'researchlab')}
                     >
                       <FlaskConical className="h-4 w-4" />

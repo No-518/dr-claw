@@ -187,11 +187,20 @@
   "projectDashboard": {
     "title": "项目仪表盘",
     "subtitle": "集中查看所有工作区进度，并快速回到正在进行的项目。",
+    "overviewBadge": "工作区总览",
+    "sharedBadge": "共享工作区资源",
+    "skillsTitle": "技能库",
+    "skillsDescription": "所有项目共享同一套已安装技能。现在从全局仪表盘统一查看和管理，而不是放在单个项目内部。",
+    "openSkillsLibrary": "打开技能库",
+    "activityTitle": "最新活动",
+    "projectsSectionTitle": "项目列表",
+    "projectsSectionSubtitle": "快速打开活跃工作区、查看进度，并直接进入下一步任务，无需在侧边栏里来回查找。",
     "emptyTitle": "还没有项目",
     "emptyDescription": "从侧边栏创建或添加工作区后，这里会显示所有项目及其进度。",
     "summary": {
       "projects": "项目数",
       "sessions": "会话数",
+      "tracked": "已跟踪项目",
       "progress": "平均进度",
       "trackedProjects": "已跟踪 {{count}} 个"
     },

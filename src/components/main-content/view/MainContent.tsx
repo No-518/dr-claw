@@ -116,6 +116,26 @@ function MainContent({
     );
   }
 
+  if (activeTab === 'skills') {
+    return (
+      <div className="h-full flex flex-col">
+        <MainContentHeader
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          selectedProject={null}
+          selectedSession={null}
+          shouldShowTasksTab={shouldShowTasksTab}
+          isMobile={isMobile}
+          onMenuClick={onMenuClick}
+        />
+
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <SkillsDashboard />
+        </div>
+      </div>
+    );
+  }
+
   if (!selectedProject) {
     return <MainContentStateView mode="empty" isMobile={isMobile} onMenuClick={onMenuClick} />;
   }
@@ -195,12 +215,6 @@ function MainContent({
                 selectedProject={selectedProject}
                 onNavigateToChat={() => setActiveTab('chat')}
               />
-            </div>
-          )}
-
-          {activeTab === 'skills' && (
-            <div className="h-full overflow-hidden">
-              <SkillsDashboard selectedProject={selectedProject} />
             </div>
           )}
 

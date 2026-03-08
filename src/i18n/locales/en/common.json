@@ -187,11 +187,20 @@
   "projectDashboard": {
     "title": "Project Dashboard",
     "subtitle": "Track every workspace and jump back into active work quickly.",
+    "overviewBadge": "Workspace Overview",
+    "sharedBadge": "Shared Workspace Resource",
+    "skillsTitle": "Skills Library",
+    "skillsDescription": "All projects use the same installed skills. Manage and inspect them here from the global dashboard instead of inside each project.",
+    "openSkillsLibrary": "Open Skills Library",
+    "activityTitle": "Latest Activity",
+    "projectsSectionTitle": "Projects",
+    "projectsSectionSubtitle": "Open active workspaces, review progress, and jump into the next task without digging through the sidebar.",
     "emptyTitle": "No projects yet",
     "emptyDescription": "Create or add a workspace from the sidebar to start tracking project progress here.",
     "summary": {
       "projects": "Projects",
       "sessions": "Sessions",
+      "tracked": "Tracked Projects",
       "progress": "Average Progress",
       "trackedProjects": "{{count}} tracked"
     },

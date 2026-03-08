@@ -444,6 +444,17 @@ export function useProjectsState({
     }
   }, [isMobile, navigate]);
 
+  const handleOpenSkills = useCallback(() => {
+    setSelectedProject(null);
+    setSelectedSession(null);
+    setActiveTab('skills');
+    navigate('/');
+
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile, navigate]);
+
   const handleSessionDelete = useCallback(
     (sessionIdToDelete: string) => {
       if (selectedSession?.id === sessionIdToDelete) {
@@ -544,6 +555,7 @@ export function useProjectsState({
       isMobile,
       activeTab,
       onOpenDashboard: handleOpenDashboard,
+      onOpenSkills: handleOpenSkills,
     }),
     [
       handleNewSession,
@@ -558,6 +570,7 @@ export function useProjectsState({
       projects,
       activeTab,
       handleOpenDashboard,
+      handleOpenSkills,
       settingsInitialTab,
       selectedProject,
       selectedSession,
@@ -587,6 +600,7 @@ export function useProjectsState({
     handleProjectSelect,
     handleSessionSelect,
     handleOpenDashboard,
+    handleOpenSkills,
     handleNewSession,
     handleSessionDelete,
     handleProjectDelete,
