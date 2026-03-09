@@ -1,4 +1,4 @@
-import { Blocks, FolderPlus, LayoutDashboard, PanelLeftClose, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { Blocks, FolderPlus, LayoutDashboard, Newspaper, PanelLeftClose, Plus, RefreshCw, Search, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import type { AppTab } from '../../../../types/app';
 import { Button } from '../../../ui/button';
@@ -18,6 +18,7 @@ type SidebarHeaderProps = {
   activeTab: AppTab;
   onOpenDashboard: () => void;
   onOpenSkills: () => void;
+  onOpenNews: () => void;
   onCreateProject: () => void;
   onCollapseSidebar: () => void;
   t: TFunction;
@@ -36,6 +37,7 @@ export default function SidebarHeader({
   activeTab,
   onOpenDashboard,
   onOpenSkills,
+  onOpenNews,
   onCreateProject,
   onCollapseSidebar,
   t,
@@ -146,6 +148,16 @@ export default function SidebarHeader({
               <Blocks className="h-4 w-4" />
               {t('common:projectDashboard.skillsTitle')}
             </Button>
+
+            <Button
+              variant={activeTab === 'news' ? 'secondary' : 'outline'}
+              size="sm"
+              className="h-9 w-full justify-start rounded-xl"
+              onClick={onOpenNews}
+            >
+              <Newspaper className="h-4 w-4" />
+              {t('common:tabs.news')}
+            </Button>
           </div>
         )}
       </div>
@@ -228,6 +240,15 @@ export default function SidebarHeader({
             >
               <Blocks className="h-4 w-4" />
               {t('common:projectDashboard.skillsTitle')}
+            </Button>
+
+            <Button
+              variant={activeTab === 'news' ? 'secondary' : 'outline'}
+              className="h-10 w-full justify-start rounded-xl"
+              onClick={onOpenNews}
+            >
+              <Newspaper className="h-4 w-4" />
+              {t('common:tabs.news')}
             </Button>
           </div>
         )}

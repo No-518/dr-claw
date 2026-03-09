@@ -455,6 +455,17 @@ export function useProjectsState({
     }
   }, [isMobile, navigate]);
 
+  const handleOpenNews = useCallback(() => {
+    setSelectedProject(null);
+    setSelectedSession(null);
+    setActiveTab('news');
+    navigate('/');
+
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile, navigate]);
+
   const handleSessionDelete = useCallback(
     (sessionIdToDelete: string) => {
       if (selectedSession?.id === sessionIdToDelete) {
@@ -556,6 +567,7 @@ export function useProjectsState({
       activeTab,
       onOpenDashboard: handleOpenDashboard,
       onOpenSkills: handleOpenSkills,
+      onOpenNews: handleOpenNews,
     }),
     [
       handleNewSession,
@@ -571,6 +583,7 @@ export function useProjectsState({
       activeTab,
       handleOpenDashboard,
       handleOpenSkills,
+      handleOpenNews,
       settingsInitialTab,
       selectedProject,
       selectedSession,
@@ -601,6 +614,7 @@ export function useProjectsState({
     handleSessionSelect,
     handleOpenDashboard,
     handleOpenSkills,
+    handleOpenNews,
     handleNewSession,
     handleSessionDelete,
     handleProjectDelete,

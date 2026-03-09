@@ -41,6 +41,7 @@ function Sidebar({
   activeTab,
   onOpenDashboard,
   onOpenSkills,
+  onOpenNews,
 }: SidebarProps) {
   const { t } = useTranslation(['sidebar', 'common']);
   const { isPWA } = useDeviceSettings({ trackMobile: false });
@@ -270,6 +271,7 @@ function Sidebar({
             activeTab={activeTab}
             onOpenDashboard={onOpenDashboard}
             onOpenSkills={onOpenSkills}
+            onOpenNews={onOpenNews}
             onCreateProject={() => void handleQuickCreateProject()}
             onCollapseSidebar={handleCollapseSidebar}
             updateAvailable={updateAvailable}

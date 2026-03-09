@@ -271,6 +271,19 @@ export const api = {
       body: JSON.stringify({ dirPath }),
     }),
 
+  // News dashboard endpoints
+  news: {
+    getConfig: () => authenticatedFetch('/api/news/config'),
+    updateConfig: (config) =>
+      authenticatedFetch('/api/news/config', {
+        method: 'PUT',
+        body: JSON.stringify(config),
+      }),
+    search: () =>
+      authenticatedFetch('/api/news/search', { method: 'POST' }),
+    getResults: () => authenticatedFetch('/api/news/results'),
+  },
+
   // Generic GET method for any endpoint
   get: (endpoint) => authenticatedFetch(`/api${endpoint}`),
 
