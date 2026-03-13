@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="public/favicon.png" alt="VibeLab" width="96" height="96">
-  <h1>VibeLab: Your AI Research Assistant</h1>
-  <p><strong>Plan, run, and write research in one workspace.</strong></p>
+  <img src="public/drclaw.jpg" alt="VibeLab" width="96" height="128">
+  <h1>Dr. Claw: Your AI Research Assistant</h1>
+  <p><strong>Full-stack research workspace.</strong></p>
 </div>
 
 <p align="center">
@@ -141,7 +141,7 @@ After starting VibeLab, open your browser and follow the steps below.
 When you first open VibeLab you will see the **Projects** sidebar. You have two options:
 
 - **Open an existing project** — VibeLab auto-discovers registered projects and linked sessions from Claude Code, Codex, and Gemini.
-- **Create a new project** — Click the **"+"** button, choose a directory on your machine, and VibeLab will set up the workspace: agent folders such as `.claude/`, `.agents/`, `.gemini/`, standard workspace metadata, linked `skills/` directories, preset research dirs (`Survey/references`, `Survey/reports`, `Ideation/ideas`, `Ideation/references`, `Experiment/code_references`, `Experiment/datasets`, `Experiment/core_code`, `Experiment/analysis`, `Publication/paper`, `Publication/homepage`, `Publication/slide`), and **instance.json** at the project root with absolute paths for those directories. Cursor agent support is coming soon.
+- **Create a new project** — Click the **"+"** button, choose a directory on your machine, and VibeLab will set up the workspace: agent folders such as `.claude/`, `.agents/`, `.gemini/`, standard workspace metadata, linked `skills/` directories, preset research dirs (`Survey/references`, `Survey/reports`, `Ideation/ideas`, `Ideation/references`, `Experiment/code_references`, `Experiment/datasets`, `Experiment/core_code`, `Experiment/analysis`, `Publication/paper`, `Promotion/homepage`, `Promotion/slides`, `Promotion/audio`, `Promotion/video`), and **instance.json** at the project root with absolute paths for those directories. Cursor agent support is coming soon.
 
 > **Default project storage path:** New projects are stored under `~/vibelab` by default. You can change this in **Settings → Appearance → Default Project Path**, or set the `WORKSPACES_ROOT` environment variable. The setting is persisted in `~/.claude/project-config.json`.
 

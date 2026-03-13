@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import type { TFunction } from 'i18next';
 import { api } from '../../../utils/api';
-import type { Project, ProjectSession } from '../../../types/app';
+import type { Project, ProjectSession, SessionProvider } from '../../../types/app';
 import type {
   AdditionalSessionsByProject,
   DeleteProjectConfirmation,
@@ -394,10 +394,24 @@ export function useSidebarController({
   }, [onRefresh]);
 
   const updateSessionSummary = useCallback(
-    async (_projectName: string, _sessionId: string, _summary: string) => {
-      // Session rename endpoint is not currently exposed on the API.
-      setEditingSession(null);
-      setEditingSessionName('');
+    async (projectName: string, sessionId: string, summary: string, provider: SessionProvider = 'claude') => {
+      try {
+        const response = await api.renameSession(projectName, sessionId, summary, provider);
+        if (response.ok) {
+          if (window.refreshProjects) {
+            await window.refreshProjects();
+          } else {
+            window.location.reload();
+          }
+        } else {
+          console.error('Failed to rename session');
+        }
+      } catch (error) {
+        console.error('Error renaming session:', error);
+      } finally {
+        setEditingSession(null);
+        setEditingSessionName('');
+      }
     },
     [],
   );

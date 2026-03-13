@@ -44,7 +44,8 @@ import pty from 'node-pty';
 import fetch from 'node-fetch';
 import mime from 'mime-types';
 
-import { getProjects, getSessions, getSessionMessages, renameProject, deleteSession, deleteProject, addProjectManually, extractProjectDirectory, clearProjectDirectoryCache } from './projects.js';
+import { getProjects, getSessions, getSessionMessages, renameProject, renameSession, deleteSession, deleteProject, addProjectManually, extractProjectDirectory, clearProjectDirectoryCache } from './projects.js';
+import { getProjectTokenUsageSummary } from './project-token-usage.js';
 import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getActiveClaudeSDKSessions, resolveToolApproval } from './claude-sdk.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from './cursor-cli.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from './openai-codex.js';
@@ -428,195 +429,6 @@ app.use('/api/news', authenticateToken, newsRoutes);
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
 
-// Serve public files (like api-docs.html)
-app.use(express.static(path.join(__dirname, '../public')));
-
-// Static files served after API routes
-// Add cache control: HTML files should not be cached, but assets can be cached
-app.use(express.static(path.join(__dirname, '../dist'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
-      // Prevent HTML caching to avoid service worker issues after builds
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    } else if (filePath.match(/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico)$/)) {
-      // Cache static assets for 1 year (they have hashed names)
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    }
-  }
-}));
-
-// API Routes (protected)
-// /api/config endpoint removed - no longer needed
-// Frontend now uses window.location for WebSocket URLs
-
-// System update endpoint
-app.post('/api/system/update', authenticateToken, async (req, res) => {
-    try {
-        // Get the project root directory (parent of server directory)
-        const projectRoot = path.join(__dirname, '..');
-
-        console.log('Starting system update from directory:', projectRoot);
-
-        // Run the update command based on installation mode
-        const updateCommand = installMode === 'git'
-            ? 'git checkout main && git pull && npm install'
-            : `npm install -g ${npmPackageName}@latest`;
-
-        const child = spawn('sh', ['-c', updateCommand], {
-            cwd: installMode === 'git' ? projectRoot : os.homedir(),
-            env: process.env
-        });
-
-        let output = '';
-        let errorOutput = '';
-
-        child.stdout.on('data', (data) => {
-            const text = data.toString();
-            output += text;
-            console.log('Update output:', text);
-        });
-
-        child.stderr.on('data', (data) => {
-            const text = data.toString();
-            errorOutput += text;
-            console.error('Update error:', text);
-        });
-
-        child.on('close', (code) => {
-            if (code === 0) {
-                res.json({
-                    success: true,
-                    output: output || 'Update completed successfully',
-                    message: 'Update completed. Please restart the server to apply changes.'
-                });
-            } else {
-                res.status(500).json({
-                    success: false,
-                    error: 'Update command failed',
-                    output: output,
-                    errorOutput: errorOutput
-                });
-            }
-        });
-
-        child.on('error', (error) => {
-            console.error('Update process error:', error);
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
-        });
-
-    } catch (error) {
-        console.error('System update error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-app.get('/api/projects', authenticateToken, async (req, res) => {
-    try {
-        const projects = await getProjects(broadcastProgress);
-        res.json(projects);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/api/projects/:projectName/sessions', authenticateToken, async (req, res) => {
-    try {
-        const { limit = 5, offset = 0 } = req.query;
-        const result = await getSessions(req.params.projectName, parseInt(limit), parseInt(offset));
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get messages for a specific session
-app.get('/api/projects/:projectName/sessions/:sessionId/messages', authenticateToken, async (req, res) => {
-    try {
-        const { projectName, sessionId } = req.params;
-        const { limit, offset, provider } = req.query;
-
-        // Parse limit and offset if provided
-        const parsedLimit = limit ? parseInt(limit, 10) : null;
-        const parsedOffset = offset ? parseInt(offset, 10) : 0;
-
-        const result = await getSessionMessages(projectName, sessionId, parsedLimit, parsedOffset, provider);
-
-        // Handle both old and new response formats
-        if (Array.isArray(result)) {
-            // Backward compatibility: no pagination parameters were provided
-            res.json({ messages: result });
-        } else {
-            // New format with pagination info
-            res.json(result);
-        }
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Rename project endpoint
-app.put('/api/projects/:projectName/rename', authenticateToken, async (req, res) => {
-    try {
-        const { displayName } = req.body;
-        await renameProject(req.params.projectName, displayName);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Delete session endpoint
-app.delete('/api/projects/:projectName/sessions/:sessionId', authenticateToken, async (req, res) => {
-    try {
-        const { projectName, sessionId } = req.params;
-        const { provider } = req.query;
-        console.log(`[API] Deleting session: ${sessionId} from project: ${projectName}, provider: ${provider || 'claude'}`);
-        await deleteSession(projectName, sessionId, provider);
-        console.log(`[API] Session ${sessionId} deleted successfully`);
-        res.json({ success: true });
-    } catch (error) {
-        console.error(`[API] Error deleting session ${req.params.sessionId}:`, error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Delete project endpoint (force=true to delete with sessions)
-app.delete('/api/projects/:projectName', authenticateToken, async (req, res) => {
-    try {
-        const { projectName } = req.params;
-        const force = req.query.force === 'true';
-        await deleteProject(projectName, force);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Create project endpoint
-app.post('/api/projects/create', authenticateToken, async (req, res) => {
-    try {
-        const { path: projectPath } = req.body;
-
-        if (!projectPath || !projectPath.trim()) {
-            return res.status(400).json({ error: 'Project path is required' });
-        }
-
-        const project = await addProjectManually(projectPath.trim());
-        res.json({ success: true, project });
-    } catch (error) {
-        console.error('Error creating project:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
 const expandWorkspacePath = async (inputPath) => {
     if (!inputPath) return inputPath;
     const root = await getWorkspacesRoot();
@@ -624,7 +436,7 @@ const expandWorkspacePath = async (inputPath) => {
         return root;
     }
     if (inputPath.startsWith('~/') || inputPath.startsWith('~\\')) {
-        return path.join(root, inputPath.slice(2));
+        return path.join(os.homedir(), inputPath.slice(2));
     }
     return inputPath;
 };
@@ -747,6 +559,227 @@ app.post('/api/create-folder', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error creating folder:', error);
         res.status(500).json({ error: 'Failed to create folder' });
+    }
+});
+
+// Serve public files (like api-docs.html)
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Static files served after API routes
+// Add cache control: HTML files should not be cached, but assets can be cached
+app.use(express.static(path.join(__dirname, '../dist'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      // Prevent HTML caching to avoid service worker issues after builds
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else if (filePath.match(/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico)$/)) {
+      // Cache static assets for 1 year (they have hashed names)
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }
+}));
+
+// API Routes (protected)
+// /api/config endpoint removed - no longer needed
+// Frontend now uses window.location for WebSocket URLs
+
+// System update endpoint
+app.post('/api/system/update', authenticateToken, async (req, res) => {
+    try {
+        // Get the project root directory (parent of server directory)
+        const projectRoot = path.join(__dirname, '..');
+
+        console.log('Starting system update from directory:', projectRoot);
+
+        // Run the update command based on installation mode
+        const updateCommand = installMode === 'git'
+            ? 'git checkout main && git pull && npm install'
+            : `npm install -g ${npmPackageName}@latest`;
+
+        const child = spawn('sh', ['-c', updateCommand], {
+            cwd: installMode === 'git' ? projectRoot : os.homedir(),
+            env: process.env
+        });
+
+        let output = '';
+        let errorOutput = '';
+
+        child.stdout.on('data', (data) => {
+            const text = data.toString();
+            output += text;
+            console.log('Update output:', text);
+        });
+
+        child.stderr.on('data', (data) => {
+            const text = data.toString();
+            errorOutput += text;
+            console.error('Update error:', text);
+        });
+
+        child.on('close', (code) => {
+            if (code === 0) {
+                res.json({
+                    success: true,
+                    output: output || 'Update completed successfully',
+                    message: 'Update completed. Please restart the server to apply changes.'
+                });
+            } else {
+                res.status(500).json({
+                    success: false,
+                    error: 'Update command failed',
+                    output: output,
+                    errorOutput: errorOutput
+                });
+            }
+        });
+
+        child.on('error', (error) => {
+            console.error('Update process error:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        });
+
+    } catch (error) {
+        console.error('System update error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/projects', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const projects = await getProjects(userId, broadcastProgress);
+        res.json(projects);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/projects/token-usage-summary', authenticateToken, async (req, res) => {
+    try {
+        const projectRefs = req.body?.projects;
+        if (!Array.isArray(projectRefs)) {
+            return res.status(400).json({ error: 'projects array is required' });
+        }
+
+        const summary = await getProjectTokenUsageSummary(projectRefs);
+        res.json(summary);
+    } catch (error) {
+        console.error('Error building project token usage summary:', error);
+        res.status(500).json({ error: 'Failed to build project token usage summary' });
+    }
+});
+
+app.get('/api/projects/:projectName/sessions', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { limit = 5, offset = 0 } = req.query;
+        const result = await getSessions(req.params.projectName, parseInt(limit), parseInt(offset), userId);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get messages for a specific session
+app.get('/api/projects/:projectName/sessions/:sessionId/messages', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { projectName, sessionId } = req.params;
+        const { limit, offset, provider } = req.query;
+
+        // Parse limit and offset if provided
+        const parsedLimit = limit ? parseInt(limit, 10) : null;
+        const parsedOffset = offset ? parseInt(offset, 10) : 0;
+
+        const result = await getSessionMessages(projectName, sessionId, parsedLimit, parsedOffset, provider, userId);
+
+        // Handle both old and new response formats
+        if (Array.isArray(result)) {
+            // Backward compatibility: no pagination parameters were provided
+            res.json({ messages: result });
+        } else {
+            // New format with pagination info
+            res.json(result);
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Rename project endpoint
+app.put('/api/projects/:projectName/rename', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { displayName } = req.body;
+        await renameProject(req.params.projectName, displayName, userId);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Rename session endpoint
+app.put('/api/projects/:projectName/sessions/:sessionId/rename', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { projectName, sessionId } = req.params;
+        const { summary, provider } = req.body;
+        await renameSession(projectName, sessionId, summary, provider, userId);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete session endpoint
+app.delete('/api/projects/:projectName/sessions/:sessionId', authenticateToken, async (req, res) => {
+    try {
+        const { projectName, sessionId } = req.params;
+        const { provider } = req.query;
+        console.log(`[API] Deleting session: ${sessionId} from project: ${projectName}, provider: ${provider || 'claude'}`);
+        await deleteSession(projectName, sessionId, provider);
+        console.log(`[API] Session ${sessionId} deleted successfully`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error(`[API] Error deleting session ${req.params.sessionId}:`, error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete project endpoint (force=true to delete with sessions)
+app.delete('/api/projects/:projectName', authenticateToken, async (req, res) => {
+    try {
+        const { projectName } = req.params;
+        const force = req.query.force === 'true';
+        await deleteProject(projectName, force);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create project endpoint
+app.post('/api/projects/create', authenticateToken, async (req, res) => {
+    try {
+        const { path: projectPath } = req.body;
+
+        if (!projectPath || !projectPath.trim()) {
+            return res.status(400).json({ error: 'Project path is required' });
+        }
+
+        const project = await addProjectManually(projectPath.trim(), null, req.user?.id);
+        res.json({ success: true, project });
+    } catch (error) {
+        console.error('Error creating project:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
