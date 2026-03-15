@@ -12,8 +12,8 @@ function sanitizeGitError(message, token) {
   return message.replace(new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '***');
 }
 
-// Default workspace root: ~/vibelab
-const DEFAULT_WORKSPACES_ROOT = path.join(os.homedir(), 'vibelab');
+// Default workspace root: ~ (home directory)
+const DEFAULT_WORKSPACES_ROOT = os.homedir();
 
 // Dynamic workspace root: config file > env var > ~/vibelab
 export async function getWorkspacesRoot() {
@@ -108,7 +108,6 @@ export async function validateWorkspacePath(requestedPath) {
         } catch (parentError) {
           if (parentError.code === 'ENOENT') {
             // Parent doesn't exist either - use the absolute path as-is
-            // We'll validate it's within allowed root
             realPath = absolutePath;
           } else {
             throw parentError;
@@ -119,37 +118,16 @@ export async function validateWorkspacePath(requestedPath) {
       }
     }
 
-    // Resolve the workspace root to its real path
-    const currentWorkspacesRoot = await getWorkspacesRoot();
-    const resolvedWorkspaceRoot = await fs.realpath(currentWorkspacesRoot);
-
-    // Ensure the resolved path is contained within the allowed workspace root
-    if (!realPath.startsWith(resolvedWorkspaceRoot + path.sep) &&
-        realPath !== resolvedWorkspaceRoot) {
-      return {
-        valid: false,
-        error: `Workspace path must be within the allowed workspace root: ${currentWorkspacesRoot}`
-      };
-    }
-
     // Additional symlink check for existing paths
     try {
       await fs.access(absolutePath);
       const stats = await fs.lstat(absolutePath);
 
       if (stats.isSymbolicLink()) {
-        // Verify symlink target is also within allowed root
+        // Resolve target
         const linkTarget = await fs.readlink(absolutePath);
         const resolvedTarget = path.resolve(path.dirname(absolutePath), linkTarget);
-        const realTarget = await fs.realpath(resolvedTarget);
-
-        if (!realTarget.startsWith(resolvedWorkspaceRoot + path.sep) &&
-            realTarget !== resolvedWorkspaceRoot) {
-          return {
-            valid: false,
-            error: 'Symlink target is outside the allowed workspace root'
-          };
-        }
+        realPath = await fs.realpath(resolvedTarget);
       }
     } catch (error) {
       if (error.code !== 'ENOENT') {

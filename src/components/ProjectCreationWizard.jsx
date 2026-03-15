@@ -10,7 +10,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
   const { t } = useTranslation();
   // Wizard state
   const [step, setStep] = useState(1); // 1: Choose type, 2: Configure, 3: Confirm
-  const [workspaceType, setWorkspaceType] = useState('existing'); // 'existing' or 'new' - default to 'existing'
+  const [workspaceType, setWorkspaceType] = useState('new'); // 'new' or 'existing' - default to 'new'
 
   // Form state
   const [workspacePath, setWorkspacePath] = useState('');
@@ -75,13 +75,13 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
       try {
         const response = await api.browseFilesystem('~');
         const data = await response.json();
-        const basePath = data.path || '~/vibelab';
+        const basePath = data.path || '~';
         const suggestedPath = appendPathSegment(basePath, suggestedName);
         setWorkspacePath((currentPath) => (currentPath.trim() ? currentPath : suggestedPath));
         setProjectName((currentName) => (currentName.trim() ? currentName : suggestedName));
       } catch (error) {
         console.error('Error auto-filling workspace path:', error);
-        const fallbackPath = `~/vibelab/${suggestedName}`;
+        const fallbackPath = `~/${suggestedName}`;
         setWorkspacePath((currentPath) => (currentPath.trim() ? currentPath : fallbackPath));
         setProjectName((currentName) => (currentName.trim() ? currentName : suggestedName));
       }
@@ -200,13 +200,15 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
 
   const openFolderBrowser = async () => {
     setShowFolderBrowser(true);
-    await loadBrowserFolders('~/vibelab');
+    // Start at current path if valid, otherwise home
+    const startPath = workspacePath && workspacePath.trim() ? workspacePath.trim() : '~';
+    await loadBrowserFolders(startPath);
   };
 
   const loadBrowserFolders = async (path) => {
     try {
       setLoadingFolders(true);
-      const response = await api.browseFilesystem(path);
+      const response = await api.browseFilesystem(path, showHiddenFolders);
       const data = await response.json();
       setBrowserCurrentPath(data.path || path);
       setBrowserFolders(data.suggestions || []);
@@ -216,6 +218,13 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
       setLoadingFolders(false);
     }
   };
+
+  // Reload folders when showHiddenFolders changes
+  useEffect(() => {
+    if (showFolderBrowser) {
+      loadBrowserFolders(browserCurrentPath);
+    }
+  }, [showHiddenFolders]);
 
   const selectFolder = (folderPath, advanceToConfirm = false) => {
     setWorkspacePath(folderPath);
@@ -332,30 +341,6 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
                   {t('projectWizard.step1.question')}
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Existing Workspace */}
-                  <button
-                    onClick={() => setWorkspaceType('existing')}
-                    className={`p-4 border-2 rounded-lg text-left transition-all ${
-                      workspaceType === 'existing'
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <FolderPlus className="w-5 h-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div className="flex-1">
-                        <h5 className="font-semibold text-gray-900 dark:text-white mb-1">
-                          {t('projectWizard.step1.existing.title')}
-                        </h5>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {t('projectWizard.step1.existing.description')}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-
                   {/* New Workspace */}
                   <button
                     onClick={() => setWorkspaceType('new')}
@@ -375,6 +360,30 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
                         </h5>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                           {t('projectWizard.step1.new.description')}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Existing Workspace */}
+                  <button
+                    onClick={() => setWorkspaceType('existing')}
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                      workspaceType === 'existing'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <FolderPlus className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="font-semibold text-gray-900 dark:text-white mb-1">
+                          {t('projectWizard.step1.existing.title')}
+                        </h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {t('projectWizard.step1.existing.description')}
                         </p>
                       </div>
                     </div>
@@ -669,18 +678,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
                   {/* Parent Directory - check for Windows root (e.g., C:\) and Unix root */}
                   {browserCurrentPath !== '~' && browserCurrentPath !== '/' && !/^[A-Za-z]:\\?$/.test(browserCurrentPath) && (
                     <button
-                      onClick={() => {
-                        const lastSlash = Math.max(browserCurrentPath.lastIndexOf('/'), browserCurrentPath.lastIndexOf('\\'));
-                        let parentPath;
-                        if (lastSlash <= 0) {
-                          parentPath = '/';
-                        } else if (lastSlash === 2 && /^[A-Za-z]:/.test(browserCurrentPath)) {
-                          parentPath = browserCurrentPath.substring(0, 3);
-                        } else {
-                          parentPath = browserCurrentPath.substring(0, lastSlash);
-                        }
-                        navigateToFolder(parentPath);
-                      }}
+                      onClick={() => navigateToFolder(getParentDirectoryPath(browserCurrentPath))}
                       className="w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-3"
                     >
                       <FolderOpen className="w-5 h-5 text-gray-400" />
