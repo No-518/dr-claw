@@ -134,3 +134,66 @@ def create_idea_project(
         timeout=timeout,
     )
     return {"project": project, "seeded": True, "chat": reply}
+
+
+def get_project_latest_message(
+    client: VibeLab,
+    project: Dict[str, Any],
+    provider: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Return the newest known session snapshot for a project."""
+    provider_filter = (provider or '').strip().lower()
+    collections = [
+        ("claude", project.get("sessions") or []),
+        ("cursor", project.get("cursorSessions") or []),
+        ("codex", project.get("codexSessions") or []),
+        ("gemini", project.get("geminiSessions") or []),
+    ]
+
+    candidates: List[Dict[str, Any]] = []
+    for collection_provider, sessions in collections:
+        if provider_filter and collection_provider != provider_filter:
+            continue
+        if not isinstance(sessions, list):
+            continue
+        for session in sessions:
+            if not isinstance(session, dict):
+                continue
+            row = dict(session)
+            row.setdefault("provider", collection_provider)
+            row.setdefault("project_name", project.get("name"))
+            row.setdefault("project_display_name", project.get("displayName") or project.get("display_name") or project.get("name"))
+            row.setdefault("project_path", project.get("fullPath") or project.get("path") or "")
+            candidates.append(row)
+
+    def timestamp_key(item: Dict[str, Any]) -> str:
+        for key in ("lastActivity", "lastModified", "updatedAt", "createdAt", "timestamp"):
+            value = item.get(key)
+            if isinstance(value, str) and value:
+                return value
+        return ""
+
+    if not candidates:
+        return {
+            "project": project.get("name"),
+            "project_display_name": project.get("displayName") or project.get("display_name") or project.get("name"),
+            "project_path": project.get("fullPath") or project.get("path") or "",
+            "session": None,
+        }
+
+    candidates.sort(key=timestamp_key, reverse=True)
+    latest = candidates[0]
+    return {
+        "project": project.get("name"),
+        "project_display_name": project.get("displayName") or project.get("display_name") or project.get("name"),
+        "project_path": project.get("fullPath") or project.get("path") or "",
+        "session": {
+            "session_id": latest.get("session_id") or latest.get("sessionId") or latest.get("id") or "",
+            "provider": latest.get("provider") or provider_filter or "claude",
+            "summary": latest.get("summary") or latest.get("title") or latest.get("name") or "",
+            "last_activity": timestamp_key(latest),
+            "last_user_message": latest.get("lastUserMessage") or "",
+            "last_assistant_message": latest.get("lastAssistantMessage") or "",
+            "message_count": latest.get("messageCount"),
+        },
+    }

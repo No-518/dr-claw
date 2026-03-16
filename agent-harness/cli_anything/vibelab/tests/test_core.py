@@ -242,6 +242,91 @@ class TestProjects(unittest.TestCase):
             },
         )
 
+class TestDigests(unittest.TestCase):
+
+    def _make_client(self, json_data, status_code=200):
+        """Return a VibeLab client whose HTTP methods return fake responses."""
+        from cli_anything.vibelab.core.session import VibeLab
+
+        client = VibeLab()
+        client.get = MagicMock(return_value=_fake_response(json_data, status_code))
+        client.put = MagicMock(return_value=_fake_response({"success": True}))
+        client.post = MagicMock(return_value=_fake_response({"success": True, "project": {"name": "proj-abc"}}))
+        client.delete = MagicMock(return_value=_fake_response({"success": True}))
+        return client
+
+    def test_build_portfolio_digest_recommends_waiting_project(self):
+        from cli_anything.vibelab.vibelab_cli import _build_portfolio_digest
+
+        items = [
+            {
+                "project": "proj-1",
+                "project_display_name": "Project One",
+                "project_path": "/tmp/proj-1",
+                "status": "in-progress",
+                "counts": {"total": 4, "completed": 1, "in_progress": 1, "pending": 2, "blocked": 0},
+                "latest_session": {"session_id": "sess-1", "last_assistant_message": "Please answer the following questions?"},
+                "updated_at": "2026-03-16T00:00:00Z",
+            }
+        ]
+        waiting_rows = [
+            {
+                "project": "proj-1",
+                "project_display_name": "Project One",
+                "session_id": "sess-1",
+                "summary": "waiting summary",
+            }
+        ]
+
+        payload = _build_portfolio_digest(items, waiting_rows)
+        self.assertEqual(payload["summary"]["high_priority_projects"], 1)
+        self.assertEqual(payload["recommendations"][0]["action"], "reply")
+        self.assertEqual(payload["recommendations"][0]["session_id"], "sess-1")
+
+    def test_get_project_latest_message_picks_latest_session(self):
+        """get_project_latest_message() should return the newest session snapshot."""
+        from cli_anything.vibelab.core.projects import get_project_latest_message
+
+        client = self._make_client({})
+        project = {
+            "name": "proj-1",
+            "displayName": "Project One",
+            "fullPath": "/tmp/proj-1",
+            "sessions": [
+                {
+                    "id": "old-session",
+                    "lastActivity": "2026-03-15T10:00:00.000Z",
+                    "lastAssistantMessage": "old reply",
+                },
+                {
+                    "id": "new-session",
+                    "lastActivity": "2026-03-16T10:00:00.000Z",
+                    "lastAssistantMessage": "new reply",
+                },
+            ],
+        }
+
+        payload = get_project_latest_message(client, project)
+        self.assertEqual(payload["session"]["session_id"], "new-session")
+        self.assertEqual(payload["session"]["last_assistant_message"], "new reply")
+
+    def test_get_project_latest_message_filters_provider(self):
+        """get_project_latest_message() should respect an optional provider filter."""
+        from cli_anything.vibelab.core.projects import get_project_latest_message
+
+        client = self._make_client({})
+        project = {
+            "name": "proj-1",
+            "displayName": "Project One",
+            "fullPath": "/tmp/proj-1",
+            "sessions": [{"id": "claude-session", "lastActivity": "2026-03-16T10:00:00.000Z"}],
+            "codexSessions": [{"id": "codex-session", "lastActivity": "2026-03-16T12:00:00.000Z"}],
+        }
+
+        payload = get_project_latest_message(client, project, provider="claude")
+        self.assertEqual(payload["session"]["session_id"], "claude-session")
+        self.assertEqual(payload["session"]["provider"], "claude")
+
 
 # ---------------------------------------------------------------------------
 # conversations.py tests
