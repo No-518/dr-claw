@@ -541,6 +541,172 @@ def _build_project_digest(project: Dict[str, Any], summary: Dict[str, Any], wait
     }
 
 
+
+def _project_progress_payload(ctx: Context, project_ref: str) -> Dict[str, Any]:
+    project = _resolve_project_ref(ctx.client, project_ref)
+    project_name = _require_project_name(project, project_ref)
+    summary = taskmaster_mod.build_summary(ctx.client, project_name)
+    latest = projects_mod.get_project_latest_message(ctx.client, project)
+    payload = {
+        "project": project.get("name"),
+        "project_display_name": _project_label(project),
+        "project_path": project.get("fullPath") or project.get("path") or "",
+        "status": summary.get("status"),
+        "counts": summary.get("counts") or {},
+        "next_task": summary.get("next_task") or {},
+        "guidance": summary.get("guidance") or {},
+        "updated_at": summary.get("updated_at"),
+        "latest_session": latest.get("session"),
+    }
+    return payload
+
+
+
+def _progress_brief(payload: Dict[str, Any]) -> Dict[str, Any]:
+    counts = payload.get("counts") or {}
+    latest = payload.get("latest_session") or {}
+    return {
+        "project": payload.get("project"),
+        "project_display_name": payload.get("project_display_name"),
+        "project_path": payload.get("project_path"),
+        "status": payload.get("status"),
+        "counts": counts,
+        "latest_session": latest,
+        "updated_at": payload.get("updated_at"),
+    }
+
+
+def _recommend_project_attention(payload: Dict[str, Any], waiting_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    counts = payload.get("counts") or {}
+    latest = payload.get("latest_session") or {}
+    waiting_for_project = [
+        row for row in waiting_rows
+        if row.get("project") == payload.get("project")
+        or row.get("project_display_name") == payload.get("project_display_name")
+    ]
+
+    priority = "low"
+    action = "monitor"
+    reason = "No urgent signal detected."
+    suggested_reply = ""
+
+    assistant_text = str(latest.get("last_assistant_message") or "").strip()
+    has_questions = any(token in assistant_text for token in ["?", "？", "Clarifying Questions", "澄清", "问题"])
+
+    if waiting_for_project:
+        priority = "high"
+        action = "reply"
+        reason = f"Project has {len(waiting_for_project)} waiting session(s) that need input."
+        if has_questions:
+            suggested_reply = "建议回复：直接回答它刚刚提出的澄清问题，确认目标、约束、输出物和下一步。"
+        else:
+            suggested_reply = "建议回复：让它继续执行当前任务，并汇报 blocker、下一检查点和需要你的输入。"
+    elif counts.get("blocked", 0):
+        priority = "high"
+        action = "unblock"
+        reason = f"Project has {counts.get('blocked', 0)} blocked task(s)."
+        suggested_reply = "建议回复：让它说明当前 blocker、缺少的输入，以及解除阻塞后的下一步。"
+    elif counts.get("in_progress", 0):
+        priority = "medium"
+        action = "check_progress"
+        reason = f"Project has {counts.get('in_progress', 0)} in-progress task(s)."
+        suggested_reply = "建议回复：请总结当前实验进展、已完成部分、风险和下一阶段计划。"
+    elif counts.get("total", 0) == 0 and latest:
+        priority = "medium"
+        action = "plan"
+        reason = "Project has active discussion context but no formal task pipeline yet."
+        suggested_reply = "建议回复：请把当前讨论收敛成 research brief、阶段拆分和 draft tasks。"
+    elif counts.get("pending", 0):
+        priority = "medium"
+        action = "start_next"
+        reason = f"Project has {counts.get('pending', 0)} pending task(s) ready to start."
+        suggested_reply = "建议回复：从下一个 pending 任务开始执行，并汇报第一个可验证产物。"
+
+    return {
+        "project": payload.get("project"),
+        "project_display_name": payload.get("project_display_name"),
+        "priority": priority,
+        "action": action,
+        "reason": reason,
+        "session_id": waiting_for_project[0].get("session_id") if waiting_for_project else latest.get("session_id"),
+        "suggested_reply": suggested_reply,
+    }
+
+
+def _build_portfolio_digest(items: List[Dict[str, Any]], waiting_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    briefs = [_progress_brief(item) for item in items]
+    recommendations = [_recommend_project_attention(item, waiting_rows) for item in items]
+    priority_rank = {"high": 0, "medium": 1, "low": 2}
+    recommendations.sort(key=lambda row: (priority_rank.get(row.get("priority"), 9), str(row.get("project_display_name") or "")))
+    return {
+        "projects": briefs,
+        "recommendations": recommendations,
+        "summary": {
+            "project_count": len(briefs),
+            "waiting_sessions": len(waiting_rows),
+            "tasks_total": sum((item.get("counts") or {}).get("total", 0) for item in items),
+            "tasks_completed": sum((item.get("counts") or {}).get("completed", 0) for item in items),
+            "high_priority_projects": sum(1 for row in recommendations if row.get("priority") == "high"),
+            "medium_priority_projects": sum(1 for row in recommendations if row.get("priority") == "medium"),
+        },
+    }
+
+
+def _format_portfolio_digest(payload: Dict[str, Any]) -> str:
+    summary = payload.get("summary") or {}
+    recommendations = payload.get("recommendations") or []
+    projects = payload.get("projects") or []
+
+    lines = ["[VibeLab Portfolio Digest]"]
+    lines.append(
+        f"Projects: {summary.get('project_count', 0)} | Waiting: {summary.get('waiting_sessions', 0)} | Tasks: {summary.get('tasks_completed', 0)}/{summary.get('tasks_total', 0)} done"
+    )
+    lines.append(
+        f"Attention: high {summary.get('high_priority_projects', 0)} | medium {summary.get('medium_priority_projects', 0)}"
+    )
+
+    if recommendations:
+        lines.append("Focus:")
+        for row in recommendations[:5]:
+            segment = f"- [{row.get('priority')}] {row.get('project_display_name')}: {row.get('reason')}"
+            if row.get("session_id"):
+                segment += f" session={row['session_id']}"
+            lines.append(segment)
+            if row.get("suggested_reply"):
+                lines.append(f"  {row['suggested_reply']}")
+
+    if projects:
+        lines.append("Progress:")
+        for item in projects[:8]:
+            counts = item.get("counts") or {}
+            lines.append(
+                f"- {item.get('project_display_name')}: status={item.get('status')} done {counts.get('completed', 0)}/{counts.get('total', 0)}, in-progress {counts.get('in_progress', 0)}, pending {counts.get('pending', 0)}, blocked {counts.get('blocked', 0)}"
+            )
+    return "\n".join(lines)
+
+def _format_project_progress(payload: Dict[str, Any]) -> str:
+    counts = payload.get("counts") or {}
+    next_task = payload.get("next_task") or {}
+    latest = payload.get("latest_session") or {}
+
+    lines = [f"[Project Progress] {payload.get('project_display_name') or payload.get('project')}"]
+    lines.append(f"Status: {payload.get('status') or 'unknown'}")
+    lines.append(
+        f"Progress: {counts.get('completed', 0)}/{counts.get('total', 0)} done, "
+        f"in-progress {counts.get('in_progress', 0)}, pending {counts.get('pending', 0)}, blocked {counts.get('blocked', 0)}"
+    )
+    if next_task:
+        lines.append(f"Next: #{next_task.get('id', '?')} {next_task.get('title') or 'Untitled task'}")
+    if latest:
+        lines.append(f"Latest session: {latest.get('provider')} {latest.get('session_id')}")
+        if latest.get('last_assistant_message'):
+            lines.append(f"Last assistant: {_truncate_text(latest.get('last_assistant_message'), 220)}")
+        elif latest.get('last_user_message'):
+            lines.append(f"Last user: {_truncate_text(latest.get('last_user_message'), 220)}")
+    if payload.get("updated_at"):
+        lines.append(f"Updated: {payload['updated_at']}")
+    return "\n".join(lines)
+
 def _build_daily_digest(items: List[Dict[str, Any]]) -> Dict[str, Any]:
     waiting_total = sum(len(item.get("waiting") or []) for item in items)
     task_total = sum((item.get("counts") or {}).get("total", 0) for item in items)
@@ -784,6 +950,38 @@ def projects_idea(
             if reply:
                 info("\nInitial reply:")
                 click.echo(reply)
+    except Exception as exc:
+        _handle_error(exc, ctx.json_mode)
+
+@projects.command("latest")
+@click.argument("project_ref")
+@click.option("--provider", type=click.Choice(_PROVIDER_CHOICES, case_sensitive=False), default=None, help="Optional provider filter.")
+@pass_context
+def projects_latest(ctx: Context, project_ref: str, provider: Optional[str]) -> None:
+    """Show the latest known message snapshot for PROJECT_REF."""
+    try:
+        project = _resolve_project_ref(ctx.client, project_ref)
+        payload = projects_mod.get_project_latest_message(
+            ctx.client,
+            project,
+            provider=_normalize_provider(provider),
+        )
+        output(payload, json_mode=ctx.json_mode, title=f"Latest Message: {_project_label(project)}")
+    except Exception as exc:
+        _handle_error(exc, ctx.json_mode)
+
+
+@projects.command("progress")
+@click.argument("project_ref")
+@pass_context
+def projects_progress(ctx: Context, project_ref: str) -> None:
+    """Show project completion progress and latest session context."""
+    try:
+        payload = _project_progress_payload(ctx, project_ref)
+        if ctx.json_mode:
+            output(payload, json_mode=True)
+        else:
+            click.echo(_format_project_progress(payload))
     except Exception as exc:
         _handle_error(exc, ctx.json_mode)
 
@@ -1576,6 +1774,89 @@ def chat_reply(
         _handle_error(exc, ctx.json_mode)
 
 
+@chat.command("project")
+@click.option("--project", "project_ref", required=True, metavar="PROJECT", help="Project name, display name, or filesystem path.")
+@click.option("--session", "session_id", default=None, metavar="SESSION_ID", help="Existing session ID to continue. Defaults to the latest session for the project.")
+@click.option("--provider", type=click.Choice(_PROVIDER_CHOICES, case_sensitive=False), default=None, help="Provider for a new session when no existing session is chosen.")
+@click.option("--message", "message", "-m", default=None, metavar="TEXT", help="Single message to send without entering interactive mode.")
+@click.option("--timeout", type=int, default=180, show_default=True, metavar="SECONDS", help="Maximum seconds to wait for each reply.")
+@click.option("--json", "force_json", is_flag=True, default=False, help="Output results as JSON.")
+@pass_context
+def chat_project(
+    ctx: Context,
+    project_ref: str,
+    session_id: Optional[str],
+    provider: Optional[str],
+    message: Optional[str],
+    timeout: int,
+    force_json: bool,
+) -> None:
+    """Enter a project session and issue multiple project-specific instructions."""
+    try:
+        if force_json:
+            ctx.json_mode = True
+        project = _resolve_project_ref(ctx.client, project_ref, allow_path_fallback=True)
+        project_path = project.get("fullPath") or project.get("path") or project_ref
+        latest = projects_mod.get_project_latest_message(ctx.client, project)
+        chosen_session = session_id or ((latest.get("session") or {}).get("session_id") or None)
+        chosen_provider = _normalize_provider(provider)
+        if not chosen_provider and chosen_session:
+            chosen_provider = _resolve_session_provider(ctx.client, project, chosen_session)
+        if not chosen_provider:
+            chosen_provider = "claude"
+
+        def run_turn(text: str) -> Dict[str, Any]:
+            return chat_mod.send_message(
+                ctx.client,
+                project_path=str(project_path),
+                message=text,
+                provider=chosen_provider or "claude",
+                session_id=chosen_session,
+                timeout=timeout,
+            )
+
+        if message:
+            result = run_turn(message)
+            payload = {
+                "project": project.get("name") or project.get("fullPath") or project.get("path"),
+                "project_display_name": _project_label(project),
+                "project_path": result.get("project_path"),
+                "provider": result.get("provider", chosen_provider),
+                "session_id": result.get("session_id") or chosen_session,
+                "reply": result.get("reply", ""),
+            }
+            output(payload if ctx.json_mode else payload.get("reply", ""), json_mode=ctx.json_mode, title=f"Project Chat: {_project_label(project)}")
+            return
+
+        if ctx.json_mode:
+            raise ValueError("Interactive project chat is only available without --json. Use -m/--message for single-turn JSON output.")
+
+        success(f"Project chat: {_project_label(project)}", json_mode=False)
+        info(f"  path     : {project_path}")
+        info(f"  provider : {chosen_provider}")
+        if chosen_session:
+            info(f"  session  : {chosen_session}")
+        info("  type /exit or /quit to leave")
+
+        while True:
+            prompt = click.prompt("vibelab", prompt_suffix="> ", default="", show_default=False)
+            text = str(prompt or "").strip()
+            if not text:
+                continue
+            if text in {"/exit", "/quit"}:
+                break
+            result = run_turn(text)
+            chosen_session = result.get("session_id") or chosen_session
+            chosen_provider = result.get("provider", chosen_provider)
+            click.echo(result.get("reply", ""))
+            if chosen_session:
+                info(f"Session: {chosen_session}")
+    except (EOFError, KeyboardInterrupt):
+        click.echo()
+    except Exception as exc:
+        _handle_error(exc, ctx.json_mode)
+
+
 @chat.command("sessions")
 @click.option("--project", "project_ref", default=None, metavar="PROJECT", help="Optional project name, display name, or path filter.")
 @click.option("--provider", type=click.Choice(_PROVIDER_CHOICES, case_sensitive=False), default=None, help="Optional provider filter.")
@@ -1734,6 +2015,44 @@ def digest_project(ctx: Context, project_ref: str, force_json: bool, push_opencl
             output(payload, json_mode=True)
         else:
             click.echo(_format_project_digest(payload))
+            if payload.get("openclaw_notification", {}).get("sent"):
+                info(f"OpenClaw: sent to {payload['openclaw_notification']['channel']}")
+    except Exception as exc:
+        _handle_error(exc, ctx.json_mode)
+
+
+@digest.command("portfolio")
+@click.option("--json", "force_json", is_flag=True, default=False, help="Output results as JSON.")
+@click.option("--push-openclaw", is_flag=True, default=False, help="Send the digest to the configured OpenClaw channel.")
+@click.option("--to", "channel", default=None, metavar="CHANNEL", help="Override the OpenClaw channel.")
+@pass_context
+def digest_portfolio(ctx: Context, force_json: bool, push_openclaw: bool, channel: Optional[str]) -> None:
+    """Build a cross-project progress summary with attention recommendations."""
+    try:
+        if force_json:
+            ctx.json_mode = True
+        projects = projects_mod.list_projects(ctx.client)
+        waiting_rows = chat_mod.get_waiting_sessions_compact(ctx.client)
+        items = []
+        for project in projects:
+            try:
+                ref = project.get("name") or project.get("fullPath") or project.get("path")
+                if not ref:
+                    continue
+                items.append(_project_progress_payload(ctx, ref))
+            except Exception:
+                continue
+        payload = _build_portfolio_digest(items, waiting_rows)
+        if push_openclaw or channel:
+            resolved_channel = _resolve_push_channel(channel)
+            if not resolved_channel:
+                raise ValueError("No channel specified. Use --to <channel> or run `vibelab openclaw configure --push-channel <channel>` first.")
+            send_output = _send_openclaw_message(_format_portfolio_digest(payload), resolved_channel)
+            payload["openclaw_notification"] = {"sent": True, "channel": resolved_channel, "output": send_output}
+        if ctx.json_mode:
+            output(payload, json_mode=True)
+        else:
+            click.echo(_format_portfolio_digest(payload))
             if payload.get("openclaw_notification", {}).get("sent"):
                 info(f"OpenClaw: sent to {payload['openclaw_notification']['channel']}")
     except Exception as exc:

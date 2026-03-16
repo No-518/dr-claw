@@ -47,6 +47,18 @@ List projects:
 vibelab projects list
 ```
 
+Inspect the latest message in a project:
+
+```bash
+vibelab projects latest <project> --json
+```
+
+Inspect project progress and next actions:
+
+```bash
+vibelab projects progress <project> --json
+```
+
 Create a new empty project workspace:
 
 ```bash
@@ -132,6 +144,12 @@ Per-project digest:
 vibelab digest project --project <project> --json
 ```
 
+Cross-project portfolio digest with recommended follow-ups:
+
+```bash
+vibelab digest portfolio --json
+```
+
 Artifacts and workflow state:
 
 ```bash
@@ -171,5 +189,6 @@ Pattern: user suddenly has a new idea
 4. Continue the discussion with `vibelab chat reply` on that session.
 
 Pattern: user wants an update without opening VibeLab
-1. Run `vibelab digest daily --json` or `vibelab digest project --project ... --json`.
-2. Summarize only the load-bearing items: waiting sessions, task progress, blockers, next actions.
+1. Run `vibelab digest daily --json`, `vibelab digest project --project ... --json`, or `vibelab digest portfolio --json`.
+2. Use `digest portfolio` when the user wants cross-project progress, attention recommendations, or suggested replies.
+3. Summarize only the load-bearing items: waiting sessions, task progress, blockers, next actions.
