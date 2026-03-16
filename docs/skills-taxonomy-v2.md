@@ -226,13 +226,6 @@ Manual corrections live in [../skills/skills-taxonomy-v2.overrides.json](../skil
 - `capabilities`: `search-retrieval`
 - `domains`: `cs-ai`
 
-### `inno-research-orchestrator`
-
-- `primaryIntent`: `research`
-- `intents`: `research`, `experiment`
-- `capabilities`: `research-planning`, `agent-workflow`
-- `domains`: `general`
-
 ### `vllm`
 
 - `primaryIntent`: `deployment`

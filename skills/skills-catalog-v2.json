@@ -1377,8 +1377,7 @@
       "relatedSkills": [
         "inno-deep-research",
         "inno-code-survey",
-        "inno-pipeline-planner",
-        "inno-research-orchestrator"
+        "inno-pipeline-planner"
       ]
     },
     {
@@ -1869,7 +1868,6 @@
       },
       "relatedSkills": [
         "inno-pipeline-planner",
-        "inno-research-orchestrator",
         "mamba-architecture",
         "inno-idea-eval"
       ]
@@ -2175,7 +2173,6 @@
         "domain": "General"
       },
       "relatedSkills": [
-        "inno-research-orchestrator",
         "gemini-deep-research",
         "inno-code-survey",
         "inno-deep-research"
@@ -2314,51 +2311,6 @@
         "inno-experiment-analysis",
         "constitutional-ai",
         "evaluating-code-models"
-      ]
-    },
-    {
-      "name": "inno-research-orchestrator",
-      "primaryIntent": "research",
-      "intents": [
-        "research",
-        "experiment"
-      ],
-      "capabilities": [
-        "research-planning",
-        "agent-workflow"
-      ],
-      "domains": [
-        "general"
-      ],
-      "keywords": [
-        "inno-research-orchestrator",
-        "orchestration",
-        "research-planning",
-        "agent-workflow",
-        "inno",
-        "research",
-        "orchestrator",
-        "receives",
-        "free",
-        "form",
-        "user",
-        "input"
-      ],
-      "source": "dr-claw",
-      "status": "verified",
-      "summary": "Receives free-form user input about a research task, judges its maturity (plan vs idea), and constructs the standardized inputs needed by inno-prepare-resources. Use when the user wants to start a research pipeline — regardless of how comp...",
-      "legacy": {
-        "dirPath": "inno-research-orchestrator",
-        "skillFile": "skills/inno-research-orchestrator/SKILL.md",
-        "topLevelGroup": "Standalone",
-        "collection": "Orchestration",
-        "domain": "Agent"
-      },
-      "relatedSkills": [
-        "inno-pipeline-planner",
-        "gemini-deep-research",
-        "inno-deep-research",
-        "inno-code-survey"
       ]
     },
     {

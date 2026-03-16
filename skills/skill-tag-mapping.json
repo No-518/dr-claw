@@ -1,7 +1,6 @@
 {
   "version": 1,
   "stageOverrides": {
-    "inno-research-orchestrator": { "zh": "阶段: 编排", "en": "Stage: Orchestration", "ko": "단계: 오케스트레이션" },
     "inno-prepare-resources": { "zh": "阶段: 资源准备", "en": "Stage: Resource Prep", "ko": "단계: 리소스 준비" },
     "dataset-discovery": { "zh": "阶段: 资源准备", "en": "Stage: Resource Prep", "ko": "단계: 리소스 준비" },
     "inno-idea-generation": { "zh": "阶段: Idea生成", "en": "Stage: Idea Generation", "ko": "단계: 아이디어 생성" },
@@ -238,8 +237,7 @@
     "inno-paper-writing",
     "inno-prepare-resources",
     "inno-rclone-to-overleaf",
-    "inno-reference-audit",
-    "inno-research-orchestrator"
+    "inno-reference-audit"
   ],
   "domainCsAiExceptions": [
     "bioinformatics-init-analysis",

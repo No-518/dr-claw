@@ -28,7 +28,7 @@ The UI should send the chosen input (and type hint if available) to the backend 
 - **Options**:
   1. **LLM-based**: Single short prompt; input = user text or `task1`/`task2`; output = `plan` or `idea` (and optional confidence). Backend uses this to set branch.
   2. **Heuristic**: If instance has `task1` with substantial length/structure → plan; else → idea. If user explicitly chose "I have a full plan" in UI → plan.
-- **Where to implement**: In the backend handler for `POST /api/research/start`, or in a small service that the meta skill **inno-research-orchestrator** describes. The meta skill’s SKILL.md documents the same logic so an agent can replicate it when running from chat.
+- **Where to implement**: In the backend handler for `POST /api/research/start`, or in a small service that encapsulates the same judgment logic for chat and backend entry points.
 
 ## Flow after judgment
 

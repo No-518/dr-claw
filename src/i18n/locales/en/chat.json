@@ -262,8 +262,9 @@
     "promptMulti": "Please use the following skills for this task: {{skills}}.\n\nDescribe your research task here:"
   },
   "guidedStarter": {
-    "title": "What do you want to do today?",
-    "description": "Pick one research option to auto-fill a structured prompt template.",
+    "greeting": "Hi {{username}}",
+    "title": "What should we do next?",
+    "description": "Choose a direction to fill the prompt quickly.",
     "refresh": "Randomize",
     "recommendedSkills": "Recommended skills for this option",
     "loadingSkills": "Checking available skills...",
@@ -279,32 +280,36 @@
       "output": "Please provide a step-by-step plan and start with the first actionable task."
     },
     "scenarios": {
+      "startFullProject": {
+        "title": "Start a project",
+        "description": "Set up the full research project, define the pipeline, and turn the idea into an actionable plan."
+      },
       "paperReproduction": {
-        "title": "I want to reproduce a paper",
+        "title": "Reproduce a paper",
         "description": "Read the paper, identify key implementation details, and build a reproducibility plan."
       },
       "literatureSurvey": {
-        "title": "I want a literature survey",
+        "title": "Literature survey",
         "description": "Collect recent papers, summarize trends, and map open research gaps."
       },
       "researchIdea": {
-        "title": "I want to refine a research idea",
+        "title": "Refine an idea",
         "description": "Turn a rough direction into clear hypotheses, novelty, and evaluation criteria."
       },
       "experimentPlan": {
-        "title": "I want an experiment plan",
+        "title": "Plan an experiment",
         "description": "Design baselines, metrics, ablations, and risk controls before implementation."
       },
       "paperWriting": {
-        "title": "I want to write a paper draft",
+        "title": "Draft a paper",
         "description": "Structure sections, sharpen claims, and align writing with target venue expectations."
       },
       "manuscriptReview": {
-        "title": "I want manuscript review",
+        "title": "Review a draft",
         "description": "Run a reviewer-style check for methods, evidence, references, and writing quality."
       },
       "presentationPromotion": {
-        "title": "I want presentation materials",
+        "title": "Presentation materials",
         "description": "Turn the paper into slides, narration scripts, TTS audio, and a demo video."
       }
     }

@@ -21,8 +21,6 @@ Skills read paths from `instance.json` and write logs under each area’s `logs/
 ```
 skills/
 │
-├─ inno-research-orchestrator               [Orchestration] meta flow control, plan-vs-idea judgment
-│
 ├─ Research & Discovery
 │  ├─ inno-prepare-resources                Setup: load instance, GitHub search, arXiv download
 │  ├─ dataset-discovery                     Find and evaluate datasets for a research task

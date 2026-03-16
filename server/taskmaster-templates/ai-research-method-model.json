@@ -101,19 +101,19 @@
             "title": "Define novelty claim and theoretical motivation",
             "description": "Clarify what is new, why it should work, and expected tradeoffs.",
             "taskType": "analysis",
-            "recommended_skills": ["inno-research-orchestrator"]
+            "recommended_skills": ["inno-idea-generation", "academic-researcher"]
           },
           {
             "id": "method_design_space_and_baselines",
             "title": "Map design space and baseline comparison plan",
             "description": "Identify main design alternatives and strong baseline families.",
             "taskType": "exploration",
-            "recommended_skills": ["inno-idea-generation", "inno-research-orchestrator"]
+            "recommended_skills": ["inno-idea-generation", "inno-code-survey"]
           }
         ],
         "recommended_skills": [
-          "inno-idea-generation",
-          "inno-research-orchestrator"
+          "inno-pipeline-planner",
+          "inno-idea-generation"
         ]
       },
       "experiment": {

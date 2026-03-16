@@ -131,12 +131,6 @@
     "capabilities": ["evaluation-benchmarking", "search-retrieval"],
     "domains": ["general"]
   },
-  "inno-research-orchestrator": {
-    "primaryIntent": "research",
-    "intents": ["research", "experiment"],
-    "capabilities": ["research-planning", "agent-workflow"],
-    "domains": ["general"]
-  },
   "llamaguard": {
     "primaryIntent": "deployment",
     "intents": ["deployment", "evaluation"],

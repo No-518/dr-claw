@@ -8,6 +8,13 @@ export interface GuidedPromptScenario {
 
 export const GUIDED_PROMPT_SCENARIOS: GuidedPromptScenario[] = [
   {
+    id: 'start-full-project',
+    icon: '🚀',
+    titleKey: 'guidedStarter.scenarios.startFullProject.title',
+    descriptionKey: 'guidedStarter.scenarios.startFullProject.description',
+    skills: ['inno-pipeline-planner', 'academic-researcher', 'inno-idea-generation'],
+  },
+  {
     id: 'paper-reproduction',
     icon: '📄',
     titleKey: 'guidedStarter.scenarios.paperReproduction.title',

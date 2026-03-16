@@ -262,8 +262,9 @@
     "promptMulti": "请使用以下技能完成这个任务：{{skills}}。\n\n在此描述你的任务："
   },
   "guidedStarter": {
-    "title": "你现在想做什么？",
-    "description": "选择一个研究任务方向，即可一键生成结构化提问模板。",
+    "greeting": "Hi {{username}}",
+    "title": "接下来我们做什么？",
+    "description": "选择一个方向，快速填充提问内容。",
     "refresh": "随机换一组",
     "recommendedSkills": "该方向推荐 Skills",
     "loadingSkills": "正在检测可用 Skills...",
@@ -279,32 +280,36 @@
       "output": "请先给出分步执行计划，并从第一个可落地任务开始。"
     },
     "scenarios": {
+      "startFullProject": {
+        "title": "启动项目",
+        "description": "从头搭建完整研究项目，明确流程，并把想法转成可执行计划。"
+      },
       "paperReproduction": {
-        "title": "我想复现一篇论文",
+        "title": "复现论文",
         "description": "先读懂论文与关键实现细节，再制定可执行的复现计划。"
       },
       "literatureSurvey": {
-        "title": "我想做文献调研",
+        "title": "文献调研",
         "description": "收集近期代表工作，整理研究脉络并识别空白点。"
       },
       "researchIdea": {
-        "title": "我想打磨研究想法",
+        "title": "打磨想法",
         "description": "把模糊方向变成清晰假设、创新点和评估标准。"
       },
       "experimentPlan": {
-        "title": "我想制定实验方案",
+        "title": "制定实验",
         "description": "在实现前设计基线、指标、消融实验与风险控制。"
       },
       "paperWriting": {
-        "title": "我想写论文初稿",
+        "title": "论文初稿",
         "description": "梳理章节结构、论点表达，并贴合目标会议写作风格。"
       },
       "manuscriptReview": {
-        "title": "我想审阅论文稿件",
+        "title": "审阅稿件",
         "description": "以审稿视角检查方法、证据、引用与写作质量。"
       },
       "presentationPromotion": {
-        "title": "我想做 Presentation / 汇报材料",
+        "title": "汇报材料",
         "description": "基于论文内容生成演示文稿、旁白脚本、音频与演示视频。"
       }
     }

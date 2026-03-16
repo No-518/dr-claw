@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Compass, Shuffle } from 'lucide-react';
+import { Compass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   GUIDED_PROMPT_SCENARIOS,
   type GuidedPromptScenario,
 } from '../../constants/guidedPromptScenarios';
 import { api } from '../../../../utils/api';
+import { useAuth } from '../../../../contexts/AuthContext';
 
 interface GuidedPromptStarterProps {
   projectName: string;
@@ -17,19 +18,6 @@ interface SkillTreeNode {
   name: string;
   type: 'directory' | 'file';
   children?: SkillTreeNode[];
-}
-
-function shuffleScenarios() {
-  const list = [...GUIDED_PROMPT_SCENARIOS];
-  for (let i = list.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [list[i], list[j]] = [list[j], list[i]];
-  }
-  return list.slice(0, 4);
-}
-
-function getStorageKey(projectName: string) {
-  return `guided_starter_examples_${projectName}`;
 }
 
 function buildTemplate(
@@ -46,44 +34,14 @@ function buildTemplate(
   ].join('\n');
 }
 
-function resolveInitialExamples(projectName: string) {
-  if (typeof window === 'undefined') {
-    return shuffleScenarios();
-  }
-
-  try {
-    const saved = sessionStorage.getItem(getStorageKey(projectName));
-    if (!saved) {
-      const next = shuffleScenarios();
-      sessionStorage.setItem(getStorageKey(projectName), JSON.stringify(next.map((item) => item.id)));
-      return next;
-    }
-    const ids = JSON.parse(saved) as string[];
-    const savedItems = ids
-      .map((id) => GUIDED_PROMPT_SCENARIOS.find((item) => item.id === id))
-      .filter((item): item is GuidedPromptScenario => Boolean(item))
-      .slice(0, 4);
-    if (savedItems.length > 0) {
-      return savedItems;
-    }
-  } catch {
-    // Fall through to random generation.
-  }
-
-  const next = shuffleScenarios();
-  if (typeof window !== 'undefined') {
-    sessionStorage.setItem(getStorageKey(projectName), JSON.stringify(next.map((item) => item.id)));
-  }
-  return next;
-}
-
 export default function GuidedPromptStarter({
-  projectName,
+  projectName: _projectName,
   setInput,
   textareaRef,
 }: GuidedPromptStarterProps) {
   const { t } = useTranslation('chat');
-  const [examples, setExamples] = useState(() => resolveInitialExamples(projectName));
+  const { user } = useAuth();
+  const username = (user as { username?: string } | null)?.username ?? null;
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
   const [availableSkills, setAvailableSkills] = useState<Set<string> | null>(null);
 
@@ -152,59 +110,44 @@ export default function GuidedPromptStarter({
     injectTemplate(scenario, matchedSkills.length > 0 ? matchedSkills : scenario.skills);
   };
 
-  const handleRefreshExamples = () => {
-    const next = shuffleScenarios();
-    setExamples(next);
-    setSelectedScenarioId(null);
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem(getStorageKey(projectName), JSON.stringify(next.map((item) => item.id)));
-    }
-  };
-
   return (
-    <div className="mt-6 rounded-xl border border-cyan-300/50 dark:border-cyan-700/50 bg-gradient-to-br from-cyan-50/80 via-sky-50/60 to-emerald-50/40 dark:from-cyan-950/30 dark:via-sky-950/20 dark:to-emerald-950/10 p-4 sm:p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <div className="mt-8 px-1">
+      <div className="flex items-start gap-3">
         <div className="flex items-start gap-2.5 min-w-0">
-          <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center">
+          <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 via-sky-500 to-emerald-400 flex items-center justify-center shadow-[0_8px_24px_rgba(34,211,238,0.3)]">
             <Compass className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">{t('guidedStarter.title')}</p>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+            {username ? (
+              <p className="text-base sm:text-lg font-medium tracking-tight text-white/78">
+                {t('guidedStarter.greeting', { username })}
+              </p>
+            ) : null}
+            <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">{t('guidedStarter.title')}</p>
+            <p className="mt-1 text-sm text-white/55 leading-relaxed">
               {t('guidedStarter.description')}
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleRefreshExamples}
-          className="inline-flex items-center gap-1 rounded-md border border-cyan-300/50 dark:border-cyan-700/50 bg-white/70 dark:bg-white/5 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/90 dark:hover:bg-white/10 transition-colors"
-        >
-          <Shuffle className="h-3.5 w-3.5" />
-          {t('guidedStarter.refresh')}
-        </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        {examples.map((scenario) => {
+      <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        {GUIDED_PROMPT_SCENARIOS.map((scenario) => {
           const isActive = selectedScenarioId === scenario.id;
           return (
             <button
               key={scenario.id}
               type="button"
               onClick={() => handleScenarioSelect(scenario)}
-              className={`rounded-xl border p-3 text-left transition-colors ${
+              className={`rounded-full border px-3.5 py-2.5 text-left transition-colors ${
                 isActive
-                  ? 'border-cyan-400/60 bg-cyan-500/10 ring-1 ring-cyan-400/20'
-                  : 'border-cyan-200/60 dark:border-cyan-900/40 bg-white/70 dark:bg-white/5 hover:bg-white/90 dark:hover:bg-white/10'
+                  ? 'border-cyan-400/70 bg-cyan-400/14 text-white'
+                  : 'border-white/8 bg-white/[0.04] text-white/78 hover:bg-white/[0.08] hover:text-white'
               }`}
             >
-              <p className="text-sm font-medium text-foreground">
-                <span className="mr-1.5">{scenario.icon}</span>
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <span className="text-base leading-none">{scenario.icon}</span>
                 {t(scenario.titleKey)}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                {t(scenario.descriptionKey)}
               </p>
             </button>
           );

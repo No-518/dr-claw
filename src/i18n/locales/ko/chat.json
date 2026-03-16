@@ -262,8 +262,9 @@
     "promptMulti": "이 작업을 위해 다음 스킬을 사용해 주세요: {{skills}}.\n\n작업을 설명하세요:"
   },
   "guidedStarter": {
-    "title": "지금 무엇을 하고 싶나요?",
-    "description": "연구 작업 유형 하나를 고르면 구조화된 프롬프트 템플릿이 자동으로 채워집니다.",
+    "greeting": "Hi {{username}}",
+    "title": "다음으로 무엇을 할까요?",
+    "description": "방향을 고르면 프롬프트가 바로 채워집니다.",
     "refresh": "랜덤 변경",
     "recommendedSkills": "이 옵션의 추천 스킬",
     "loadingSkills": "사용 가능한 스킬을 확인하는 중...",
@@ -279,32 +280,36 @@
       "output": "단계별 실행 계획을 먼저 제시하고, 첫 번째 실행 가능한 작업부터 시작해 주세요."
     },
     "scenarios": {
+      "startFullProject": {
+        "title": "프로젝트 시작",
+        "description": "전체 연구 프로젝트를 세팅하고 파이프라인을 정리해 실행 가능한 계획으로 바꿉니다."
+      },
       "paperReproduction": {
-        "title": "논문을 재현하고 싶어요",
+        "title": "논문 재현",
         "description": "논문 핵심 구현 요소를 파악하고 재현 가능한 실행 계획을 세웁니다."
       },
       "literatureSurvey": {
-        "title": "문헌 조사를 하고 싶어요",
+        "title": "문헌 조사",
         "description": "최신 대표 논문을 수집하고 연구 흐름과 공백을 정리합니다."
       },
       "researchIdea": {
-        "title": "연구 아이디어를 구체화하고 싶어요",
+        "title": "아이디어 구체화",
         "description": "막연한 방향을 가설, 기여점, 평가 기준으로 명확히 정리합니다."
       },
       "experimentPlan": {
-        "title": "실험 계획을 세우고 싶어요",
+        "title": "실험 계획",
         "description": "구현 전에 베이스라인, 지표, 소거 실험, 리스크를 설계합니다."
       },
       "paperWriting": {
-        "title": "논문 초안을 쓰고 싶어요",
+        "title": "논문 초안",
         "description": "섹션 구조를 잡고 주장 표현을 다듬어 타깃 학회 스타일에 맞춥니다."
       },
       "manuscriptReview": {
-        "title": "원고 리뷰를 받고 싶어요",
+        "title": "원고 리뷰",
         "description": "리뷰어 관점에서 방법, 근거, 인용, 문장 품질을 점검합니다."
       },
       "presentationPromotion": {
-        "title": "발표 자료를 만들고 싶어요",
+        "title": "발표 자료",
         "description": "논문 내용을 바탕으로 슬라이드, 내레이션 스크립트, TTS 오디오, 데모 영상을 만듭니다."
       }
     }

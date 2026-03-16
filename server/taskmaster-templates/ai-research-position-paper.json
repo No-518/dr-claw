@@ -101,19 +101,19 @@
             "title": "Formulate central thesis and argument scope",
             "description": "Define the core position, audience, and limits of the argument.",
             "taskType": "analysis",
-            "recommended_skills": ["inno-research-orchestrator"]
+            "recommended_skills": ["inno-idea-generation", "academic-researcher"]
           },
           {
             "id": "position_evidence_map_and_counterpoints",
             "title": "Build evidence map with supporting and opposing views",
             "description": "Collect canonical support and strongest counter-evidence for balance.",
             "taskType": "exploration",
-            "recommended_skills": ["inno-idea-generation", "inno-research-orchestrator"]
+            "recommended_skills": ["inno-idea-generation", "academic-researcher"]
           }
         ],
         "recommended_skills": [
-          "inno-idea-generation",
-          "inno-research-orchestrator"
+          "inno-pipeline-planner",
+          "inno-idea-generation"
         ]
       },
       "experiment": {

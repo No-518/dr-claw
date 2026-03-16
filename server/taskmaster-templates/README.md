@@ -70,7 +70,7 @@ Current backend stage skill map (also used as fallback when a task does not prov
 | Stage | Base Skills | Type-Specific Hints |
 |---|---|---|
 | `survey` | `inno-deep-research`, `academic-researcher`, `dataset-discovery` | `exploration` -> `inno-deep-research`, `academic-researcher`, `dataset-discovery`; `analysis` -> `inno-deep-research`, `academic-researcher` |
-| `ideation` | `inno-idea-generation`, `inno-research-orchestrator`, `inno-prepare-resources` | `analysis` -> `inno-research-orchestrator`, `exploration` -> `inno-idea-generation`, `inno-code-survey` |
+| `ideation` | `inno-pipeline-planner`, `inno-idea-generation`, `inno-prepare-resources` | `analysis` -> `inno-idea-generation`, `academic-researcher`; `exploration` -> `inno-idea-generation`, `inno-code-survey` |
 | `experiment` | `inno-code-survey`, `inno-experiment-dev`, `inno-experiment-analysis` | `implementation` -> `inno-experiment-dev`, `analysis` -> `inno-experiment-analysis`, `exploration` -> `inno-code-survey` |
 | `publication` | `inno-paper-writing`, `inno-reference-audit`, `inno-rclone-to-overleaf` | `writing` -> `inno-paper-writing`, `analysis` -> `inno-reference-audit` |
 | `promotion` | `making-academic-presentations` | `scripting`/`rendering`/`narration`/`delivery` -> `making-academic-presentations` |

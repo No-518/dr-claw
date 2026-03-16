@@ -48,9 +48,9 @@ const DEFAULT_STAGE_SKILL_MAP = {
         },
     },
     ideation: {
-        base: ['inno-idea-generation', 'inno-research-orchestrator', 'inno-prepare-resources'],
+        base: ['inno-pipeline-planner', 'inno-idea-generation', 'inno-prepare-resources'],
         byTaskType: {
-            analysis: ['inno-research-orchestrator'],
+            analysis: ['inno-idea-generation', 'academic-researcher'],
             exploration: ['inno-idea-generation', 'inno-code-survey'],
         },
     },

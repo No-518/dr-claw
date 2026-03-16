@@ -101,19 +101,19 @@
             "title": "Define dataset problem statement and scope boundaries",
             "description": "Specify target use-cases, inclusion/exclusion scope, and risk boundaries.",
             "taskType": "analysis",
-            "recommended_skills": ["inno-research-orchestrator"]
+            "recommended_skills": ["inno-idea-generation", "academic-researcher"]
           },
           {
             "id": "dataset_schema_and_collection_plan",
             "title": "Design schema and data collection plan",
             "description": "Define label schema, sampling strategy, and collection channels.",
             "taskType": "exploration",
-            "recommended_skills": ["inno-idea-generation", "inno-research-orchestrator"]
+            "recommended_skills": ["inno-idea-generation", "dataset-discovery"]
           }
         ],
         "recommended_skills": [
-          "inno-idea-generation",
-          "inno-research-orchestrator"
+          "inno-pipeline-planner",
+          "inno-idea-generation"
         ]
       },
       "experiment": {

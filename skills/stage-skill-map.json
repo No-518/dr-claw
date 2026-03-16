@@ -24,7 +24,7 @@
   },
   "ideation": {
     "base": [
-      "inno-research-orchestrator",
+      "inno-pipeline-planner",
       "inno-prepare-resources",
       "inno-deep-research",
       "dataset-discovery",
@@ -35,7 +35,7 @@
     ],
     "byTaskType": {
       "analysis": [
-        "inno-research-orchestrator",
+        "inno-idea-generation",
         "inno-idea-eval",
         "inno-deep-research",
         "academic-researcher"

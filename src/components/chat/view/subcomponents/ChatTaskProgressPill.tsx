@@ -56,10 +56,51 @@ export default function ChatTaskProgressPill({
   const isLoading = Boolean(isLoadingTasks);
 
   return (
-    <div
-      className={`w-full rounded-xl border border-border/70 bg-card/95 shadow-sm backdrop-blur mt-2 mb-2 ${className}`}
-    >
-      <div className="flex items-center gap-2 px-3 py-2.5">
+    <div className={`relative w-full mt-2 mb-2 ${className}`}>
+      {expanded && (
+        <div className="absolute bottom-full left-0 right-0 z-20 mb-2 space-y-2 rounded-xl border border-border/70 bg-card/95 px-3 py-2.5 shadow-xl backdrop-blur">
+          {hasTasks ? (
+            <>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-300"
+                  style={{ width: `${summary.progress}%` }}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span>{t('tasks.compact.done')}: {summary.done}</span>
+                <span>{t('tasks.compact.inProgress')}: {summary.inProgress}</span>
+                <span>{t('tasks.compact.pending')}: {summary.pending}</span>
+              </div>
+
+              {whyNext && (
+                <p className="line-clamp-2 text-xs text-muted-foreground">
+                  {whyNext}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {t('tasks.compact.emptyHint', {
+                defaultValue: 'Talk to the Agent to generate and configure a research pipeline.',
+              })}
+            </p>
+          )}
+
+          {onShowAllTasks && (
+            <button
+              onClick={onShowAllTasks}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2.5 text-xs text-foreground transition-colors hover:bg-muted/70"
+            >
+              <ListChecks className="h-3.5 w-3.5" />
+              {t('tasks.compact.allTasks')}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-card/95 px-3 py-2.5 shadow-sm backdrop-blur">
         <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300">
           {summary.done === summary.total ? (
             <CheckCircle2 className="h-4 w-4" />
@@ -103,52 +144,9 @@ export default function ChatTaskProgressPill({
           className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted/70"
           title={expanded ? t('tasks.compact.collapse') : t('tasks.compact.expand')}
         >
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
         </button>
       </div>
-
-      {expanded && (
-        <div className="space-y-2 border-t border-border/70 px-3 py-2.5">
-          {hasTasks ? (
-            <>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-300"
-                  style={{ width: `${summary.progress}%` }}
-                />
-              </div>
-
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span>{t('tasks.compact.done')}: {summary.done}</span>
-                <span>{t('tasks.compact.inProgress')}: {summary.inProgress}</span>
-                <span>{t('tasks.compact.pending')}: {summary.pending}</span>
-              </div>
-
-              {whyNext && (
-                <p className="line-clamp-2 text-xs text-muted-foreground">
-                  {whyNext}
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              {t('tasks.compact.emptyHint', {
-                defaultValue: 'Talk to the Agent to generate and configure a research pipeline.',
-              })}
-            </p>
-          )}
-
-          {onShowAllTasks && (
-            <button
-              onClick={onShowAllTasks}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2.5 text-xs text-foreground transition-colors hover:bg-muted/70"
-            >
-              <ListChecks className="h-3.5 w-3.5" />
-              {t('tasks.compact.allTasks')}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

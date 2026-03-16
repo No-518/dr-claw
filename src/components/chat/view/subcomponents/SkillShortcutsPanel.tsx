@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface SkillShortcutsPanelProps {
@@ -46,19 +46,9 @@ export default function SkillShortcutsPanel({
   };
 
   return (
-    <div className="w-full mt-2 mb-2">
-      <div className="rounded-xl border border-border/50 bg-card/60">
-        <button
-          onClick={() => setIsCollapsed((c) => !c)}
-          className="w-full flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors rounded-xl"
-        >
-          <h3 className="text-base font-semibold text-foreground">
-            {t('skillShortcuts.title')}
-          </h3>
-          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`} />
-        </button>
-
-        {!isCollapsed && <div className="px-4 pb-4">
+    <div className="relative w-full mt-2 mb-2">
+      {!isCollapsed && <div className="absolute bottom-full left-0 right-0 z-20 mb-2 rounded-xl border border-border/60 bg-card/95 shadow-xl backdrop-blur">
+        <div className="px-4 pt-4 pb-3">
         <div className="grid grid-cols-3 gap-2">
           {CATEGORIES.map((cat) => {
             const isExpanded = expandedCategory === cat.key;
@@ -119,7 +109,23 @@ export default function SkillShortcutsPanel({
             </div>
           );
         })()}
-        </div>}
+        </div>
+      </div>}
+
+      <div className="rounded-xl border border-border/50 bg-card/60">
+        <button
+          onClick={() => setIsCollapsed((c) => !c)}
+          className="w-full flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors rounded-xl"
+        >
+          <h3 className="text-base font-semibold text-foreground">
+            {t('skillShortcuts.title')}
+          </h3>
+          {isCollapsed ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          )}
+        </button>
       </div>
     </div>
   );

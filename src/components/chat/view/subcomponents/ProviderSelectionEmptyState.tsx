@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import SessionProviderLogo from '../../../SessionProviderLogo';
 import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS, GEMINI_MODELS } from '../../../../../shared/modelConstants';
@@ -121,95 +121,83 @@ export default function ProviderSelectionEmptyState({
   /* ── New session — provider picker ── */
   if (!selectedSession && !currentSessionId) {
     return (
-      <div className="flex items-center justify-center h-full px-4">
+      <div className="flex items-center justify-center min-h-[56vh] px-4 py-8">
         <div className="w-full max-w-2xl">
           <div className="max-w-2xl mx-auto">
-          <div className="max-w-md mx-auto">
-          {/* Heading */}
-          <div className="text-center mb-8">
-            <h2 className="text-lg sm:text-xl font-semibold text-foreground tracking-tight">
-              {t('providerSelection.title')}
-            </h2>
-            <p className="text-[13px] text-muted-foreground mt-1">
-              {t('providerSelection.description')}
-            </p>
-            <p className="text-[12px] text-muted-foreground/90 mt-2">
-              {t('providerSelection.cliBackendHint', {
-                defaultValue: 'Choose a CLI backend',
-              })}
-            </p>
-          </div>
-
-          {/* Provider cards — horizontal row, equal width */}
-          <div className={`grid ${PROVIDERS.length === 1 ? 'grid-cols-1 max-w-[200px] mx-auto' : `grid-cols-${PROVIDERS.length}`} gap-2 sm:gap-2.5 mb-6`}>
-            {PROVIDERS.map((p) => {
-              const active = provider === p.id;
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => selectProvider(p.id)}
-                  className={`
-                    relative flex flex-col items-center gap-2.5 pt-5 pb-4 px-2
-                    rounded-xl border-[1.5px] transition-all duration-150
-                    active:scale-[0.97]
-                    ${active
-                      ? `${p.accent} ${p.ring} ring-2 bg-card shadow-sm`
-                      : 'border-border bg-card/60 hover:bg-card hover:border-border/80'
-                    }
-                  `}
-                >
-                  <SessionProviderLogo
-                    provider={p.id}
-                    className={`w-9 h-9 transition-transform duration-150 ${active ? 'scale-110' : ''}`}
-                  />
-                  <div className="text-center">
-                    <p className="text-[13px] font-semibold text-foreground leading-none">{p.name}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1 leading-tight">{t(p.infoKey)}</p>
-                  </div>
-                  {/* Check badge */}
-                  {active && (
-                    <div className={`absolute -top-1 -right-1 w-[18px] h-[18px] rounded-full ${p.check} flex items-center justify-center shadow-sm`}>
-                      <Check className="w-2.5 h-2.5" strokeWidth={3} />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Model picker — appears after provider is chosen */}
-          <div className={`transition-all duration-200 ${provider ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'}`}>
-            <div className="flex items-center justify-center gap-2 mb-5">
-              <span className="text-xs text-muted-foreground">{t('providerSelection.selectModel')}</span>
-              <div className="relative">
-                <select
-                  value={currentModel}
-                  onChange={(e) => handleModelChange(e.target.value)}
-                  tabIndex={-1}
-                  style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
-                  className="appearance-none bg-none pl-3 pr-7 py-1.5 text-xs font-medium bg-muted/50 border border-border/60 rounded-lg text-foreground cursor-pointer hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  {modelConfig.OPTIONS.map(({ value, label }: { value: string; label: string }) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
-              </div>
-            </div>
-
-            <p className="text-center text-xs text-muted-foreground/70">
-              {provider === 'claude'
-                ? t('providerSelection.readyPrompt.claude', { model: claudeModel })
-                : t('providerSelection.readyPrompt.default')}
-            </p>
-          </div>
-          </div>
-
           <GuidedPromptStarter
             projectName={projectName}
             setInput={setInput}
             textareaRef={textareaRef}
           />
+
+          <div className="max-w-xl mx-auto mt-10 sm:mt-12">
+            <div className="text-center mb-3">
+              <h2 className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground/75">
+                {t('providerSelection.title')}
+              </h2>
+              <p className="text-[10px] text-muted-foreground/70 mt-1">
+                {t('providerSelection.cliBackendHint', {
+                  defaultValue: 'Choose a CLI backend',
+                })}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 mb-3">
+              {PROVIDERS.map((p) => {
+                const active = provider === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => selectProvider(p.id)}
+                    className={`
+                      relative flex items-center justify-center gap-2 px-3 py-2
+                      rounded-full border transition-all duration-150
+                      active:scale-[0.97]
+                      ${active
+                        ? `${p.accent} ${p.ring} ring-1 bg-card/90 shadow-sm`
+                        : 'border-border/70 bg-card/35 hover:bg-card/55 hover:border-border'
+                      }
+                    `}
+                    >
+                    <SessionProviderLogo
+                      provider={p.id}
+                      className={`w-[18px] h-[18px] shrink-0 transition-transform duration-150 ${active ? 'scale-105' : ''}`}
+                    />
+                    <p className="text-[11px] font-medium text-foreground leading-none">{p.name}</p>
+                    {active && (
+                      <div className={`absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${p.check} flex items-center justify-center shadow-sm`}>
+                        <Check className="w-2 h-2" strokeWidth={3} />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className={`transition-all duration-200 ${provider ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'}`}>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-[11px] text-muted-foreground">{t('providerSelection.selectModel')}</span>
+                <div className="relative">
+                  <select
+                    value={currentModel}
+                    onChange={(e) => handleModelChange(e.target.value)}
+                    tabIndex={-1}
+                    className="bg-transparent pl-3 pr-6 py-1 text-[11px] font-medium border border-border/60 rounded-lg text-foreground cursor-pointer hover:bg-muted/40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    {modelConfig.OPTIONS.map(({ value, label }: { value: string; label: string }) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <p className="text-center text-[10px] text-muted-foreground/60">
+                {provider === 'claude'
+                  ? t('providerSelection.readyPrompt.claude', { model: claudeModel })
+                  : t('providerSelection.readyPrompt.default')}
+              </p>
+            </div>
+          </div>
 
         </div>
         </div>
