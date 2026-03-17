@@ -15,7 +15,7 @@ import { isTelemetryEnabled } from '../../../utils/telemetry';
 
 import { thinkingModes } from '../constants/thinkingModes';
 
-import { grantClaudeToolPermission } from '../utils/chatPermissions';
+import { grantToolPermission } from '../utils/chatPermissions';
 import { safeLocalStorage } from '../utils/chatStorage';
 import { consumeWorkspaceQaDraft, WORKSPACE_QA_DRAFT_EVENT } from '../../../utils/workspaceQa';
 import type {
@@ -1064,10 +1064,10 @@ export function useChatComposerState({
 
   const handleGrantToolPermission = useCallback(
     (suggestion: { entry: string; toolName: string }) => {
-      if (!suggestion || provider !== 'claude') {
+      if (!suggestion || (provider !== 'claude' && provider !== 'gemini')) {
         return { success: false };
       }
-      return grantClaudeToolPermission(suggestion.entry);
+      return grantToolPermission(suggestion.entry, provider);
     },
     [provider],
   );

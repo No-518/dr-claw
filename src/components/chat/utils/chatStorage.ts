@@ -1,6 +1,11 @@
 import type { ClaudeSettings } from '../types/types';
 
 export const CLAUDE_SETTINGS_KEY = 'claude-settings';
+export const GEMINI_SETTINGS_KEY = 'gemini-settings';
+
+export function getProviderSettingsKey(provider?: string) {
+  return provider === 'gemini' ? GEMINI_SETTINGS_KEY : CLAUDE_SETTINGS_KEY;
+}
 
 export const safeLocalStorage = {
   setItem: (key: string, value: string) => {
@@ -75,7 +80,11 @@ export const safeLocalStorage = {
 };
 
 export function getClaudeSettings(): ClaudeSettings {
-  const raw = safeLocalStorage.getItem(CLAUDE_SETTINGS_KEY);
+  return getProviderSettings();
+}
+
+export function getProviderSettings(provider?: string): ClaudeSettings {
+  const raw = safeLocalStorage.getItem(getProviderSettingsKey(provider));
   if (!raw) {
     return {
       allowedTools: [],
