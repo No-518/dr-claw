@@ -58,6 +58,7 @@ export default function AppContent() {
     fetchProjects,
     sidebarSharedProps,
     handleProjectSelect,
+    handleStartWorkspaceQa,
     pendingAutoIntake,
     handleProjectCreatedWithIntake,
     clearPendingAutoIntake,
@@ -251,6 +252,7 @@ export default function AppContent() {
           importedProjectAnalysisPrompt={importedProjectAnalysisPrompt}
           clearImportedProjectAnalysisPrompt={clearImportedProjectAnalysisPrompt}
           onProjectSelect={handleProjectSelect}
+          onStartWorkspaceQa={handleStartWorkspaceQa}
           newSessionMode={newSessionMode}
           onNewSessionModeChange={setNewSessionMode}
         />

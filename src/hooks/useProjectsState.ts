@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import { api } from '../utils/api';
+import { queueWorkspaceQaDraft } from '../utils/workspaceQa';
 import type {
   AppSocketMessage,
   AppTab,
@@ -458,6 +459,23 @@ export function useProjectsState({
     [isMobile, navigate],
   );
 
+  const handleStartWorkspaceQa = useCallback(
+    (project: Project, prompt: string) => {
+      setSelectedProject(project);
+      setSelectedSession(null);
+      setActiveTab('chat');
+      persistNewSessionMode('workspace_qa');
+      setNewSessionMode('workspace_qa');
+      queueWorkspaceQaDraft(project.name, prompt);
+      navigate('/');
+
+      if (isMobile) {
+        setSidebarOpen(false);
+      }
+    },
+    [isMobile, navigate],
+  );
+
   const handleProjectCreatedWithIntake = useCallback(
     (project: Project, options?: ProjectCreationOptions) => {
       setSelectedProject(project);
@@ -668,6 +686,7 @@ export function useProjectsState({
     handleOpenSkills,
     handleOpenNews,
     handleNewSession,
+    handleStartWorkspaceQa,
     handleSessionDelete,
     handleProjectDelete,
     handleSidebarRefresh,

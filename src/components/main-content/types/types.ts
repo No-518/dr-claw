@@ -73,6 +73,7 @@ export interface MainContentProps {
   importedProjectAnalysisPrompt?: ImportedProjectAnalysisPrompt | null;
   clearImportedProjectAnalysisPrompt?: () => void;
   onProjectSelect: (project: Project) => void;
+  onStartWorkspaceQa?: (project: Project, prompt: string) => void;
   newSessionMode?: SessionMode;
   onNewSessionModeChange?: (mode: SessionMode) => void;
 }

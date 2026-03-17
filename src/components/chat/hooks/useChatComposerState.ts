@@ -17,6 +17,7 @@ import { thinkingModes } from '../constants/thinkingModes';
 
 import { grantClaudeToolPermission } from '../utils/chatPermissions';
 import { safeLocalStorage } from '../utils/chatStorage';
+import { consumeWorkspaceQaDraft, WORKSPACE_QA_DRAFT_EVENT } from '../../../utils/workspaceQa';
 import type {
   ChatMessage,
   PendingPermissionRequest,
@@ -812,6 +813,51 @@ export function useChatComposerState({
       return next;
     });
   }, [selectedProject?.name]);
+
+  useEffect(() => {
+    if (!selectedProject) {
+      return;
+    }
+
+    const applyQueuedDraft = () => {
+      const draft = consumeWorkspaceQaDraft(selectedProject.name);
+      if (!draft) {
+        return;
+      }
+
+      setInput(draft);
+      inputValueRef.current = draft;
+
+      setTimeout(() => {
+        if (!textareaRef.current) {
+          return;
+        }
+
+        textareaRef.current.focus();
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        const cursor = draft.length;
+        textareaRef.current.setSelectionRange(cursor, cursor);
+        const lineHeight = parseInt(window.getComputedStyle(textareaRef.current).lineHeight);
+        setIsTextareaExpanded(textareaRef.current.scrollHeight > lineHeight * 2);
+      }, 0);
+    };
+
+    applyQueuedDraft();
+
+    const handleQueuedDraft = (event: Event) => {
+      const customEvent = event as CustomEvent<{ projectName?: string }>;
+      if (customEvent.detail?.projectName !== selectedProject.name) {
+        return;
+      }
+      applyQueuedDraft();
+    };
+
+    window.addEventListener(WORKSPACE_QA_DRAFT_EVENT, handleQueuedDraft);
+    return () => {
+      window.removeEventListener(WORKSPACE_QA_DRAFT_EVENT, handleQueuedDraft);
+    };
+  }, [selectedProject?.name, setInput]);
 
   useEffect(() => {
     if (!selectedProject) {
