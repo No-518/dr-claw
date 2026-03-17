@@ -30,6 +30,7 @@ function GitPanel({ selectedProject, isMobile, onFileOpen }) {
   const [isPulling, setIsPulling] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isInitializingRepo, setIsInitializingRepo] = useState(false);
   const [isCommitAreaCollapsed, setIsCommitAreaCollapsed] = useState(isMobile); // Collapsed by default on mobile
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'discard|commit|pull|push', file?: string, message?: string }
   const [isCreatingInitialCommit, setIsCreatingInitialCommit] = useState(false);
@@ -65,8 +66,6 @@ function GitPanel({ selectedProject, isMobile, onFileOpen }) {
     }
 
     fetchGitStatus();
-    fetchBranches();
-    fetchRemoteStatus();
   }, [selectedProject]);
 
   useEffect(() => {
@@ -107,6 +106,8 @@ function GitPanel({ selectedProject, isMobile, onFileOpen }) {
       } else {
         setGitStatus(data);
         setCurrentBranch(data.branch || 'main');
+        fetchBranches();
+        fetchRemoteStatus();
         
         // Auto-select all changed files
         const allFiles = new Set([
@@ -172,6 +173,36 @@ function GitPanel({ selectedProject, isMobile, onFileOpen }) {
     } catch (error) {
       console.error('Error fetching remote status:', error);
       setRemoteStatus(null);
+    }
+  };
+
+  const initializeGitRepository = async () => {
+    if (!selectedProject) return;
+
+    setIsInitializingRepo(true);
+    try {
+      const response = await authenticatedFetch('/api/git/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project: selectedProject.name
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchGitStatus();
+        fetchBranches();
+        fetchRemoteStatus();
+      } else {
+        console.error('Git init failed:', data.error);
+        alert(data.error || 'Failed to enable git for this project');
+      }
+    } catch (error) {
+      console.error('Error initializing git repository:', error);
+      alert('Failed to enable git for this project');
+    } finally {
+      setIsInitializingRepo(false);
     }
   };
 
@@ -960,14 +991,39 @@ function GitPanel({ selectedProject, isMobile, onFileOpen }) {
           <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-6">
             <GitBranch className="w-8 h-8 opacity-40" />
           </div>
-          <h3 className="text-lg font-medium mb-3 text-center text-foreground">{gitStatus.error}</h3>
-          {gitStatus.details && (
-            <p className="text-sm text-center leading-relaxed mb-6 max-w-md">{gitStatus.details}</p>
-          )}
-          <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 max-w-md">
-            <p className="text-sm text-primary text-center">
-              <strong>Tip:</strong> Run <code className="bg-primary/10 px-2 py-1 rounded-md font-mono text-xs">git init</code> in your project directory to initialize git source control.
-            </p>
+          <h3 className="text-lg font-medium mb-3 text-center text-foreground">Git isn&apos;t enabled for this project yet</h3>
+          <p className="text-sm text-center leading-relaxed mb-3 max-w-md text-muted-foreground">
+            Git helps you keep a history of your files, see what changed, and safely go back if needed.
+          </p>
+          <p className="text-sm text-center leading-relaxed mb-6 max-w-md text-muted-foreground">
+            You don&apos;t need to use the terminal here. Click the button below and VibeLab will set it up for you.
+          </p>
+          <div className="flex flex-col items-center gap-3 w-full max-w-md">
+            <button
+              onClick={initializeGitRepository}
+              disabled={isInitializingRepo}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+            >
+              {isInitializingRepo ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Enabling Git...</span>
+                </>
+              ) : (
+                <>
+                  <GitBranch className="w-4 h-4" />
+                  <span>Enable Git for This Project</span>
+                </>
+              )}
+            </button>
+            <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 max-w-md">
+              <p className="text-sm text-primary text-center leading-relaxed">
+                After setup, you can create your first snapshot from this panel. Advanced users can still use <code className="bg-primary/10 px-2 py-1 rounded-md font-mono text-xs">git init</code> in the project folder.
+              </p>
+            </div>
+            {gitStatus.details && gitStatus.details !== gitStatus.error && (
+              <p className="text-xs text-center text-muted-foreground max-w-md break-words">{gitStatus.details}</p>
+            )}
           </div>
         </div>
       ) : (
