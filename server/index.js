@@ -2582,11 +2582,7 @@ function permToRwx(perm) {
 }
 
 async function findAllFilesInProject(projectRoot, fileName, maxDepth = 10) {
-    const SKIP_DIRS = new Set([
-        'node_modules', '.git', '.svn', '.hg',
-        'dist', 'build', '__pycache__', '.next',
-        '.nuxt', 'coverage', '.cache', '.venv', 'venv',
-    ]);
+    const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build']);
     const results = [];
     const queue = [[projectRoot, 0]];
 
@@ -2598,13 +2594,24 @@ async function findAllFilesInProject(projectRoot, fileName, maxDepth = 10) {
         } catch { continue; }
 
         for (const entry of entries) {
-            if (entry.name === fileName && !entry.isDirectory()) {
-                results.push(path.join(dirPath, entry.name));
+            const entryPath = path.join(dirPath, entry.name);
+            let isDir = entry.isDirectory();
+
+            // Resolve symlinks (e.g. .claude/skills/* are symlinked directories)
+            if (!isDir && entry.isSymbolicLink()) {
+                try {
+                    const stats = await fsPromises.stat(entryPath);
+                    isDir = stats.isDirectory();
+                } catch { continue; }
+            }
+
+            if (entry.name === fileName && !isDir) {
+                results.push(entryPath);
                 if (results.length >= 20) return results;
             }
-            if (entry.isDirectory() && !SKIP_DIRS.has(entry.name)
-                && !entry.name.startsWith('.') && depth < maxDepth) {
-                queue.push([path.join(dirPath, entry.name), depth + 1]);
+            if (isDir && !SKIP_DIRS.has(entry.name)
+                && depth < maxDepth) {
+                queue.push([entryPath, depth + 1]);
             }
         }
     }
@@ -2617,7 +2624,35 @@ async function resolveProjectFilePath(projectRoot, inputPath) {
 
     const direct = path.resolve(projectRoot, inputPath);
     const isSimpleName = !inputPath.includes('/') && !inputPath.includes('\\');
-    if (!isSimpleName) return { resolved: direct };
+
+    // For paths with separators (e.g. "src/main.tsx"), check direct first, then search
+    if (!isSimpleName) {
+        try {
+            await fsPromises.access(direct);
+            return { resolved: direct };
+        } catch { /* not found at direct path */ }
+
+        // Search for the filename, then filter matches ending with the partial path
+        const fileName = path.basename(inputPath);
+        const normalizedInput = inputPath.split(path.sep).join('/');
+        const matches = await findAllFilesInProject(projectRoot, fileName);
+        const filtered = matches.filter(m => {
+            const rel = path.relative(projectRoot, m).split(path.sep).join('/');
+            return rel === normalizedInput || rel.endsWith('/' + normalizedInput);
+        });
+
+        if (filtered.length === 1) {
+            return { resolved: filtered[0] };
+        }
+        if (filtered.length > 1) {
+            return {
+                resolved: null,
+                candidates: filtered.map(m => path.relative(projectRoot, m))
+            };
+        }
+
+        return { resolved: direct };
+    }
 
     // 1. Hardcoded pipeline fallbacks
     const fallbackMap = {

@@ -488,6 +488,9 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
         const response = await api.readFile(file.projectName, actualPath);
 
         if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('File not found');
+          }
           throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
         }
 
@@ -689,9 +692,9 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
 
   if (candidates && !loading) {
     const pickerContent = (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="max-w-md w-full">
-          <div className="text-center mb-4">
+      <div className="flex-1 flex items-center justify-center p-8 overflow-hidden">
+        <div className="max-w-md w-full max-h-full flex flex-col">
+          <div className="text-center mb-4 shrink-0">
             <FileText className="w-8 h-8 mx-auto mb-2 text-gray-400" />
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
               Multiple files found
@@ -700,7 +703,7 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
               Select the file you want to open:
             </p>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 overflow-y-auto">
             {candidates.map(c => (
               <button key={c}
                 className="w-full text-left px-3 py-2 rounded-md border
@@ -723,7 +726,10 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
 
     if (isSidebar) {
       return (
-        <div className="w-full h-full flex flex-col bg-background">
+        <div className="w-full h-full flex flex-col bg-background relative">
+          <button onClick={onClose} className="absolute top-2 right-2 p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded z-10">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
           {pickerContent}
         </div>
       );
