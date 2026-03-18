@@ -45,14 +45,11 @@
 
 Dr. Claw is a general-purpose AI research assistant designed to help researchers and builders execute end-to-end projects across different domains. From shaping an initial idea to running experiments and preparing publication-ready outputs, Dr. Claw keeps the full workflow in one place so teams can focus on research quality and iteration speed.
 
-<details>
-<summary><strong>Product Screenshot</strong></summary>
+## Product Screenshot
 
 <p align="center">
   <img src="public/screenshots/chat.png" alt="Dr. Claw chat interface" width="1000">
 </p>
-
-</details>
 
 <details>
 <summary><strong>The Philosophy: Leveraged Cognition</strong></summary>
