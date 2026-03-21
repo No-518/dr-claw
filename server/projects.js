@@ -1067,10 +1067,15 @@ async function parseJsonlSessions(filePath, projectName = null, dbSessionMap = n
             if (entry.message?.role === 'user' && entry.message?.content) {
               const content = entry.message.content;
 
-              // Extract text from array format if needed
-              let textContent = content;
-              if (Array.isArray(content) && content.length > 0 && content[0].type === 'text') {
-                textContent = content[0].text;
+              // Extract text from all text parts if it's an array
+              let textContent = '';
+              if (Array.isArray(content)) {
+                textContent = content
+                  .filter(part => part.type === 'text')
+                  .map(part => part.text)
+                  .join(' ');
+              } else if (typeof content === 'string') {
+                textContent = content;
               }
 
               const isSystemMessage = typeof textContent === 'string' && (
@@ -1087,8 +1092,15 @@ async function parseJsonlSessions(filePath, projectName = null, dbSessionMap = n
                 textContent === 'Warmup' // Explicitly filter out "Warmup"
               );
 
-              if (typeof textContent === 'string' && textContent.length > 0 && !isSystemMessage) {
-                session.lastUserMessage = stripInternalContextPrefix(textContent);
+              if (textContent && textContent.length > 0 && !isSystemMessage) {
+                const cleaned = stripInternalContextPrefix(textContent, false);
+                if (cleaned) {
+                  // If this is the very first message (no parent), use it as initial summary
+                  if (entry.parentUuid === null && session.summary === 'New Session') {
+                    session.summary = cleaned.length > 50 ? cleaned.substring(0, 50) + '...' : cleaned;
+                  }
+                  session.lastUserMessage = cleaned;
+                }
               }
             } else if (entry.message?.role === 'assistant' && entry.message?.content) {
               // Skip API error messages using the isApiErrorMessage flag
@@ -1116,7 +1128,10 @@ async function parseJsonlSessions(filePath, projectName = null, dbSessionMap = n
                 );
 
                 if (assistantText && !isSystemAssistantMessage) {
-                  session.lastAssistantMessage = stripInternalContextPrefix(assistantText);
+                  const cleaned = stripInternalContextPrefix(assistantText, false);
+                  if (cleaned) {
+                    session.lastAssistantMessage = cleaned;
+                  }
                 }
               }
             }
