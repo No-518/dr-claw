@@ -6,6 +6,31 @@ export const CURSOR_SETTINGS_KEY = 'cursor-tools-settings';
 export const CODEX_SETTINGS_KEY = 'codex-settings';
 const SESSION_TIMER_PREFIX = 'session_timer_start_';
 
+const safeSessionStorage = {
+  setItem: (key: string, value: string) => {
+    try {
+      sessionStorage.setItem(key, value);
+    } catch (error) {
+      console.error('sessionStorage setItem error:', error);
+    }
+  },
+  getItem: (key: string): string | null => {
+    try {
+      return sessionStorage.getItem(key);
+    } catch (error) {
+      console.error('sessionStorage getItem error:', error);
+      return null;
+    }
+  },
+  removeItem: (key: string) => {
+    try {
+      sessionStorage.removeItem(key);
+    } catch (error) {
+      console.error('sessionStorage removeItem error:', error);
+    }
+  },
+};
+
 export function getProviderSettingsKey(provider?: string) {
   switch (provider) {
     case 'gemini': return GEMINI_SETTINGS_KEY;
@@ -92,7 +117,7 @@ export function persistSessionTimerStart(sessionId: string | null | undefined, s
     return;
   }
 
-  safeLocalStorage.setItem(`${SESSION_TIMER_PREFIX}${sessionId}`, String(startTime));
+  safeSessionStorage.setItem(`${SESSION_TIMER_PREFIX}${sessionId}`, String(startTime));
 }
 
 export function readSessionTimerStart(sessionId: string | null | undefined): number | null {
@@ -100,7 +125,7 @@ export function readSessionTimerStart(sessionId: string | null | undefined): num
     return null;
   }
 
-  const raw = safeLocalStorage.getItem(`${SESSION_TIMER_PREFIX}${sessionId}`);
+  const raw = safeSessionStorage.getItem(`${SESSION_TIMER_PREFIX}${sessionId}`);
   if (!raw) {
     return null;
   }
@@ -114,7 +139,7 @@ export function clearSessionTimerStart(sessionId: string | null | undefined) {
     return;
   }
 
-  safeLocalStorage.removeItem(`${SESSION_TIMER_PREFIX}${sessionId}`);
+  safeSessionStorage.removeItem(`${SESSION_TIMER_PREFIX}${sessionId}`);
 }
 
 export function moveSessionTimerStart(fromSessionId: string | null | undefined, toSessionId: string | null | undefined) {
@@ -123,7 +148,7 @@ export function moveSessionTimerStart(fromSessionId: string | null | undefined, 
   }
 
   const startTime = readSessionTimerStart(fromSessionId);
-  if (!startTime) {
+  if (!Number.isFinite(startTime)) {
     return;
   }
 

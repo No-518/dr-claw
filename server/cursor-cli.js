@@ -86,6 +86,11 @@ async function spawnCursor(command, options = {}, ws) {
       startTime: Date.now()
     });
     
+    const getSessionStartTime = () => {
+      const sessionData = activeCursorProcesses.get(capturedSessionId || processKey);
+      return sessionData?.startTime;
+    };
+
     // Handle stdout (streaming JSON responses)
     cursorProcess.stdout.on('data', (data) => {
       const rawOutput = data.toString();
@@ -131,37 +136,34 @@ async function spawnCursor(command, options = {}, ws) {
                   // Send session-created event only once for new sessions
                   if (!sessionId && !sessionCreatedSent) {
                     sessionCreatedSent = true;
-                    const sessionData = activeCursorProcesses.get(capturedSessionId || processKey);
                     ws.send({
                       type: 'session-created',
                       sessionId: capturedSessionId,
                       model: response.model,
                       cwd: response.cwd,
                       mode: sessionMode || 'research',
-                      startTime: sessionData?.startTime
+                      startTime: getSessionStartTime()
                     });
                   }
                 }
                 
                 // Send system info to frontend
-                const sessionData = activeCursorProcesses.get(capturedSessionId || processKey);
                 ws.send({
                   type: 'cursor-system',
                   data: response,
                   sessionId: capturedSessionId || sessionId || null,
-                  startTime: sessionData?.startTime
+                  startTime: getSessionStartTime()
                 });
               }
               break;
               
             case 'user':
               // Forward user message
-              const sessionDataUser = activeCursorProcesses.get(capturedSessionId || processKey);
               ws.send({
                 type: 'cursor-user',
                 data: response,
                 sessionId: capturedSessionId || sessionId || null,
-                startTime: sessionDataUser?.startTime
+                startTime: getSessionStartTime()
               });
               break;
               
@@ -176,6 +178,7 @@ async function spawnCursor(command, options = {}, ws) {
                   type: 'claude-response',
                   data: {
                     type: 'content_block_delta',
+                    startTime: getSessionStartTime(),
                     delta: {
                       type: 'text_delta',
                       text: textContent
@@ -195,7 +198,8 @@ async function spawnCursor(command, options = {}, ws) {
                 ws.send({
                   type: 'claude-response',
                   data: {
-                    type: 'content_block_stop'
+                    type: 'content_block_stop',
+                    startTime: getSessionStartTime(),
                   },
                   sessionId: capturedSessionId || sessionId || null
                 });
@@ -206,7 +210,8 @@ async function spawnCursor(command, options = {}, ws) {
                 type: 'cursor-result',
                 sessionId: capturedSessionId || sessionId,
                 data: response,
-                success: response.subtype === 'success'
+                success: response.subtype === 'success',
+                startTime: getSessionStartTime(),
               });
               break;
               
@@ -215,18 +220,18 @@ async function spawnCursor(command, options = {}, ws) {
               ws.send({
                 type: 'cursor-response',
                 data: response,
-                sessionId: capturedSessionId || sessionId || null
+                sessionId: capturedSessionId || sessionId || null,
+                startTime: getSessionStartTime(),
               });
           }
         } catch (parseError) {
           console.log('📄 Non-JSON response:', line);
           // If not JSON, send as raw text
-          const sessionData = activeCursorProcesses.get(capturedSessionId || processKey);
           ws.send({
             type: 'cursor-output',
             data: line,
             sessionId: capturedSessionId || sessionId || null,
-            startTime: sessionData?.startTime
+            startTime: getSessionStartTime()
           });
         }
       }

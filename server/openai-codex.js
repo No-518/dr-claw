@@ -356,7 +356,7 @@ export async function queryCodex(command, options = {}, ws) {
 
       // Add startTime for frontend timer synchronization
       const activeSession = currentSessionId ? activeCodexSessions.get(currentSessionId) : null;
-      if (activeSession?.startTime) {
+      if (Number.isFinite(activeSession?.startTime)) {
         transformed.startTime = activeSession.startTime;
       }
 
@@ -501,8 +501,8 @@ setInterval(() => {
 
   for (const [id, session] of activeCodexSessions.entries()) {
     if (session.status !== 'running') {
-      const startedAt = new Date(session.startedAt).getTime();
-      if (now - startedAt > maxAge) {
+      const startTime = typeof session.startTime === 'number' ? session.startTime : Number.NaN;
+      if (Number.isFinite(startTime) && now - startTime > maxAge) {
         activeCodexSessions.delete(id);
       }
     }
