@@ -164,6 +164,7 @@ function ChatInterface({
     scrollToBottom,
     scrollToBottomAndReset,
     handleScroll,
+    resolveSessionStatusCheck,
   } = useChatSessionState({
     selectedProject,
     selectedSession,
@@ -275,6 +276,7 @@ function ChatInterface({
     onSessionInactive,
     onSessionProcessing,
     onSessionNotProcessing,
+    onSessionStatusResolved: resolveSessionStatusCheck,
     onReplaceTemporarySession,
     onNavigateToSession,
   });
@@ -481,12 +483,13 @@ function ChatInterface({
   const prevIsLoadingForProcessingRef = useRef(false);
   useEffect(() => {
     const processingSessionId = selectedSession?.id || currentSessionId;
-    const loadingJustStarted = isLoading && !prevIsLoadingForProcessingRef.current;
-    prevIsLoadingForProcessingRef.current = isLoading;
+    const shouldTrackAsProcessing = isLoading && claudeStatus?.text !== 'Resuming...';
+    const loadingJustStarted = shouldTrackAsProcessing && !prevIsLoadingForProcessingRef.current;
+    prevIsLoadingForProcessingRef.current = shouldTrackAsProcessing;
     if (processingSessionId && loadingJustStarted && onSessionProcessing) {
       onSessionProcessing(processingSessionId);
     }
-  }, [currentSessionId, isLoading, onSessionProcessing, selectedSession?.id]);
+  }, [claudeStatus?.text, currentSessionId, isLoading, onSessionProcessing, selectedSession?.id]);
 
   useEffect(() => {
     return () => {

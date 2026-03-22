@@ -14,6 +14,8 @@
  */
 
 import { Codex } from '@openai/codex-sdk';
+import { encodeProjectPath, reconcileCodexSessionIndex } from './projects.js';
+import { sessionDb } from './database/db.js';
 import { recordIndexedSession } from './utils/sessionIndex.js';
 
 // Track active sessions
@@ -388,11 +390,27 @@ export async function queryCodex(command, options = {}, ws) {
       }
     }
 
+    const actualSessionId = thread.id || currentSessionId;
+    if (workingDirectory && actualSessionId) {
+      try {
+        await reconcileCodexSessionIndex(workingDirectory, {
+          sessionId: actualSessionId,
+          previousSessionId: currentSessionId,
+          projectName: encodeProjectPath(workingDirectory),
+        });
+        if (currentSessionId && actualSessionId !== currentSessionId) {
+          sessionDb.deleteSession(currentSessionId);
+        }
+      } catch (error) {
+        console.warn(`[Codex] Failed to reconcile indexed session ${actualSessionId}:`, error.message);
+      }
+    }
+
     // Send completion event
     sendMessage(ws, {
       type: 'codex-complete',
       sessionId: currentSessionId,
-      actualSessionId: thread.id
+      actualSessionId
     });
 
   } catch (error) {
