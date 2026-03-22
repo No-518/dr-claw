@@ -1127,6 +1127,9 @@ export async function spawnGemini(command, options = {}, ws) {
       if (sessionData?.heartbeat) clearInterval(sessionData.heartbeat);
       activeGeminiSessions.delete(finalSessionId);
       await cleanupGeminiTempFiles(tempFilePaths, tempDir);
+      // Send completion event immediately so the UI can settle
+      ws.send({ type: 'gemini-complete', sessionId: finalSessionId, exitCode: code, isNewSession: (!sessionId || sessionId.startsWith('new-session-')) && !!command });
+      // Post-completion housekeeping — runs after the UI receives the completion signal
       if (workingDir && finalSessionId) {
         try {
           await reconcileGeminiSessionIndex(workingDir, {
@@ -1137,7 +1140,6 @@ export async function spawnGemini(command, options = {}, ws) {
           console.warn(`[Gemini] Failed to reconcile indexed session ${finalSessionId}:`, error.message);
         }
       }
-      ws.send({ type: 'gemini-complete', sessionId: finalSessionId, exitCode: code, isNewSession: (!sessionId || sessionId.startsWith('new-session-')) && !!command });
       if (policyViolationTriggered || code === 0 || code === null) resolve();
       else reject(new Error(`Gemini CLI exited with code ${code}`));
     });

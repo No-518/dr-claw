@@ -137,6 +137,11 @@ export function useChatSessionState({
 
   const createDiff = useMemo<DiffCalculator>(() => createCachedDiffCalculator(), []);
 
+  const pendingStatusValidationSessionIdRef = useRef(pendingStatusValidationSessionId);
+  useEffect(() => {
+    pendingStatusValidationSessionIdRef.current = pendingStatusValidationSessionId;
+  }, [pendingStatusValidationSessionId]);
+
   const markSessionStatusCheckPending = useCallback((sessionId?: string | null) => {
     if (!sessionId) {
       return;
@@ -412,7 +417,7 @@ export function useChatSessionState({
           // Only set isLoading to false if it's NOT in the processingSessions set
           const isProcessing =
             processingSessions?.has(selectedSession.id) ||
-            pendingStatusValidationSessionId === selectedSession.id;
+            pendingStatusValidationSessionIdRef.current === selectedSession.id;
           if (!isProcessing) {
             setIsLoading(false);
           }
@@ -487,7 +492,6 @@ export function useChatSessionState({
     loadCursorSessionMessages,
     loadSessionMessages,
     pendingViewSessionRef,
-    pendingStatusValidationSessionId,
     resetStreamingState,
     markSessionStatusCheckPending,
     selectedProject,

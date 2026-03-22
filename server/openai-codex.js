@@ -391,6 +391,15 @@ export async function queryCodex(command, options = {}, ws) {
     }
 
     const actualSessionId = thread.id || currentSessionId;
+
+    // Send completion event immediately so the UI can settle
+    sendMessage(ws, {
+      type: 'codex-complete',
+      sessionId: currentSessionId,
+      actualSessionId
+    });
+
+    // Post-completion housekeeping — runs after the UI receives the completion signal
     if (workingDirectory && actualSessionId) {
       try {
         await reconcileCodexSessionIndex(workingDirectory, {
@@ -405,13 +414,6 @@ export async function queryCodex(command, options = {}, ws) {
         console.warn(`[Codex] Failed to reconcile indexed session ${actualSessionId}:`, error.message);
       }
     }
-
-    // Send completion event
-    sendMessage(ws, {
-      type: 'codex-complete',
-      sessionId: currentSessionId,
-      actualSessionId
-    });
 
   } catch (error) {
     const session = currentSessionId ? activeCodexSessions.get(currentSessionId) : null;
